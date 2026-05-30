@@ -1,0 +1,158 @@
+@page "/"
+@page "/login"
+@page "/aanmelden"
+@using CoachAssist.Core.DTOs.Auth
+@using CoachAssist.Core.Enums
+@inject NavigationManager Nav
+@inject ICoachAssistApiClient ApiClient
+
+<PageTitle>Aanmelden — CoachAssist</PageTitle>
+
+<div class="login-page">
+
+    @* Linkerzone: groene CoachAssist-branding (alleen zichtbaar op desktop) *@
+    <div class="brand-panel">
+        <div class="brand-top">
+            <div class="brand-logo">CA</div>
+            <span class="brand-name">CoachAssist</span>
+        </div>
+        <div class="brand-bottom">
+            <h2 class="brand-tagline">Jouw ploeg.<br />Jouw stats.</h2>
+            <p class="brand-sub">
+                Digitaliseer je amateurclub. Plan trainingen, beheer
+                opstellingen en volg de prestaties van elke speler —
+                alles op één plek.
+            </p>
+        </div>
+    </div>
+
+    @* Rechterzone: het loginformulier *@
+    <div class="form-panel">
+        <div class="form-card">
+
+            @* Logo bovenaan — vooral nuttig op mobiel waar de brandingzone wegvalt *@
+            <div class="form-logo">
+                <div class="brand-logo">CA</div>
+                <span class="form-logo-name">CoachAssist</span>
+            </div>
+
+            <h1 class="form-title">Aanmelden</h1>
+            <p class="form-subtitle">Welkom terug, log in om verder te gaan.</p>
+
+            @if (succesvol)
+            {
+                <div class="alert-success" role="status">
+                    Je bent succesvol aangemeld.
+                </div>
+            }
+
+            <div class="field">
+                <label class="field-label" for="email">E-mailadres</label>
+                <input id="email" type="email" class="field-input"
+                       placeholder="naam@club.be"
+                       @bind="email" @bind:event="oninput" />
+            </div>
+
+            <div class="field">
+                <label class="field-label" for="wachtwoord">Wachtwoord</label>
+                <div class="field-password">
+                    <input id="wachtwoord" type="@(wachtwoordZichtbaar ? "text" : "password")"
+                           class="field-input"
+                           placeholder="••••••••"
+                           @bind="wachtwoord" @bind:event="oninput" />
+                    <button type="button" class="toggle-btn"
+                            @onclick="ToggleWachtwoord"
+                            title="@(wachtwoordZichtbaar ? "Verberg wachtwoord" : "Toon wachtwoord")">
+                        @(wachtwoordZichtbaar ? "Verberg" : "Toon")
+                    </button>
+                </div>
+            </div>
+
+            <div class="forgot-row">
+                <a href="#" class="forgot-link">Wachtwoord vergeten?</a>
+            </div>
+
+            @if (!string.IsNullOrEmpty(foutmelding))
+            {
+                <div class="alert-error" role="alert">@foutmelding</div>
+            }
+
+            <button class="btn-primary" @onclick="Aanmelden" disabled="@bezig">
+                @(bezig ? "Aanmelden..." : "Aanmelden")
+            </button>
+
+            <div class="divider"><span>of</span></div>
+
+            <a href="/register" class="btn-secondary">Nog geen account? Registreren</a>
+
+        </div>
+    </div>
+</div>
+
+@code {
+    private string email = string.Empty;
+    private string wachtwoord = string.Empty;
+    private bool wachtwoordZichtbaar = false;
+    private string? foutmelding;
+    private bool succesvol = false;
+    private bool bezig = false;
+
+    private void ToggleWachtwoord() => wachtwoordZichtbaar = !wachtwoordZichtbaar;
+
+    private async Task Aanmelden()
+    {
+        foutmelding = null;
+        succesvol = false;
+
+        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(wachtwoord))
+        {
+            foutmelding = "Vul zowel je e-mailadres als je wachtwoord in.";
+            return;
+        }
+
+        if (!email.Contains("@"))
+        {
+            foutmelding = "Geef een geldig e-mailadres in.";
+            return;
+        }
+
+        bezig = true;
+
+        try
+        {
+            var auth = await ApiClient.LoginAsync(new LoginRequest
+            {
+                Email = email.Trim(),
+                Wachtwoord = wachtwoord,
+            });
+
+            var gebruiker = await ApiClient.GetCurrentUserAsync();
+            succesvol = true;
+
+            Nav.NavigateTo(BepaalDashboard(gebruiker?.Rol ?? auth.Gebruiker.Rol));
+        }
+        catch (AuthApiException ex)
+        {
+            foutmelding = ex.Message;
+        }
+        catch (HttpRequestException)
+        {
+            foutmelding = "De API is niet bereikbaar. Controleer of CoachAssist.Api draait.";
+        }
+        finally
+        {
+            bezig = false;
+        }
+    }
+
+    private static string BepaalDashboard(GebruikerRol rol)
+    {
+        return rol switch
+        {
+            GebruikerRol.Admin => "/admin",
+            GebruikerRol.Coach => "/coach",
+            GebruikerRol.Speler => "/speler",
+            _ => "/"
+        };
+    }
+}

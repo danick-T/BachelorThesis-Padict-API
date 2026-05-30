@@ -1,0 +1,213 @@
+@page "/coach/speler/{Id:int?}"
+@layout CoachAssist.Shared.Layout.CoachLayout
+@using CoachAssist.Core.DTOs.Speler
+@using CoachAssist.Core.DTOs.Statistiek
+@using CoachAssist.Core.DTOs.Wedstrijd
+@using CoachAssist.Core.Enums
+@inject ICoachAssistApiClient ApiClient
+@inject CoachAssistDataContext DataContext
+
+<PageTitle>Spelersprofiel - CoachAssist</PageTitle>
+
+<div class="app-topbar">
+    <div>
+        <div class="text-xs text-muted">@TeamNaam - Spelers</div>
+        <h1>@SpelerNaam</h1>
+        <div class="app-topbar-sub">@Positie - @Rugnummer</div>
+    </div>
+    <div class="app-topbar-actions">
+        <button class="btn-secondary">Bewerken</button>
+        <button class="btn-primary">Bericht sturen</button>
+    </div>
+</div>
+
+<div class="app-content">
+    @if (Laden)
+    {
+        <div class="card text-sm text-muted">Spelersprofiel wordt geladen...</div>
+    }
+    else if (!string.IsNullOrWhiteSpace(Fout))
+    {
+        <div class="card text-sm" style="background:#FEF2F2; border-color:#FECACA; color:#991B1B;">@Fout</div>
+    }
+    else if (Speler is null)
+    {
+        <div class="card text-sm text-muted">Deze speler kon niet gevonden worden.</div>
+    }
+    else
+    {
+        <div style="display:grid; grid-template-columns: 320px 1fr; gap: 24px;" class="profile-grid">
+            <div>
+                <div class="card" style="text-align:center; padding: 24px;">
+                    <div class="avatar" style="width: 96px; height: 96px; font-size: 32px; background: var(--highlight); color: var(--primary); margin: 0 auto;">@Initialen</div>
+                    <div class="fw-600 mt-12" style="font-size: 18px;">@SpelerNaam</div>
+                    <div class="text-sm text-muted">@Rugnummer - @Positie</div>
+                    <div class="flex gap-8 mt-12" style="justify-content:center;">
+                        <span class="badge badge-actief">Actief</span>
+                    </div>
+                </div>
+
+                <div class="card mt-16">
+                    <div class="text-xs text-muted fw-600" style="text-transform:uppercase;">Persoonlijk</div>
+                    @foreach (var i in Info)
+                    {
+                        <div class="flex-between text-sm" style="padding: 8px 0; border-bottom: 1px solid var(--border);">
+                            <span class="text-muted">@i.Label</span><span class="fw-600">@i.Waarde</span>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div>
+                <div class="stats-row" style="grid-template-columns: repeat(5, 1fr);">
+                    <div class="stat-tile"><div class="text-xs text-muted">Wedstrijden</div><div class="stat-tile-value">@SeizoenStats?.AantalWedstrijden</div><div class="stat-tile-label">Gespeeld</div></div>
+                    <div class="stat-tile"><div class="text-xs text-muted">Goals</div><div class="stat-tile-value">@SeizoenStats?.TotaalGoals</div><div class="stat-tile-label">Goals</div></div>
+                    <div class="stat-tile"><div class="text-xs text-muted">Assists</div><div class="stat-tile-value">@SeizoenStats?.TotaalAssists</div><div class="stat-tile-label">Assists</div></div>
+                    <div class="stat-tile"><div class="text-xs text-muted">Minuten</div><div class="stat-tile-value">@SeizoenStats?.TotaalMinuten</div><div class="stat-tile-label">Minuten</div></div>
+                    <div class="stat-tile"><div class="text-xs text-muted">Kaarten</div><div class="stat-tile-value">@Kaarten</div><div class="stat-tile-label">Geel/Rood</div></div>
+                </div>
+
+                <div class="tabs mt-16">
+                    @foreach (var t in TabNames)
+                    {
+                        <button class="@(Actief == t ? "active" : "")" @onclick="() => Actief = t">@t</button>
+                    }
+                </div>
+
+                @if (Actief == "Wedstrijden")
+                {
+                    <div class="card mt-16" style="padding:0;">
+                        @if (!WedstrijdRows.Any())
+                        {
+                            <div class="text-sm text-muted" style="padding: 16px;">Er zijn nog geen wedstrijdstatistieken voor deze speler.</div>
+                        }
+                        @foreach (var w in WedstrijdRows)
+                        {
+                            <div class="flex" style="padding:12px 16px; border-bottom:1px solid var(--border); align-items:center;">
+                                <div style="flex:1;" class="text-sm text-muted">@w.Datum</div>
+                                <div style="flex:2;" class="text-sm fw-600">@w.Tegen</div>
+                                <div style="flex:1;"><span class="badge @w.Cls">@w.Uitslag</span></div>
+                                <div style="width:50px;" class="text-sm">@w.Min</div>
+                                <div style="width:40px;" class="text-sm fw-600">G @w.G</div>
+                                <div style="width:40px;" class="text-sm fw-600">A @w.A</div>
+                                <div style="width:70px;" class="text-sm">@w.Kaarten</div>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="card mt-16">
+                        <div class="fw-600">Seizoenoverzicht</div>
+                        <div class="text-sm text-muted mt-8">
+                            @SpelerNaam speelde dit seizoen @AantalWedstrijden wedstrijden voor @TeamNaam.
+                            De statistieken op deze pagina komen rechtstreeks uit de databank.
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .profile-grid { grid-template-columns: 320px 1fr; }
+    @@media (max-width: 1000px) { .profile-grid { grid-template-columns: 1fr; } }
+</style>
+
+@code {
+    [Parameter] public int? Id { get; set; }
+
+    private readonly string[] TabNames = ["Overzicht", "Wedstrijden"];
+    private string Actief = "Overzicht";
+    private bool Laden = true;
+    private string? Fout;
+    private SpelerDetailResponse? Speler;
+    private SeizoenSpelerStats? SeizoenStats;
+    private readonly List<W> WedstrijdRows = new();
+
+    private string SpelerNaam => Speler is null ? "Speler" : $"{Speler.Voornaam} {Speler.Achternaam}".Trim();
+    private string TeamNaam => Speler?.TeamNaam ?? "Mijn ploeg";
+    private string Positie => PositieNaam(Speler?.VastePositie);
+    private string Rugnummer => Speler?.Rugnummer is null ? "#-" : $"#{Speler.Rugnummer}";
+    private string Initialen => Speler is null ? "S" : $"{Speler.Voornaam.FirstOrDefault()}{Speler.Achternaam.FirstOrDefault()}".ToUpperInvariant();
+    private string Kaarten => $"{SeizoenStats?.TotaalGeleKaarten ?? 0}/{SeizoenStats?.TotaalRodeKaarten ?? 0}";
+    private int AantalWedstrijden => SeizoenStats?.AantalWedstrijden ?? 0;
+
+    private IEnumerable<InfoRow> Info => Speler is null
+        ? Array.Empty<InfoRow>()
+        : new[]
+        {
+            new InfoRow("Voornaam", Speler.Voornaam),
+            new InfoRow("Achternaam", Speler.Achternaam),
+            new InfoRow("E-mail", Speler.Email ?? "-"),
+            new InfoRow("Club", Speler.ClubNaam),
+            new InfoRow("Team", Speler.TeamNaam),
+            new InfoRow("Positie", Positie)
+        };
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Id is null)
+        {
+            Fout = "Er werd geen speler gekozen.";
+            Laden = false;
+            return;
+        }
+
+        try
+        {
+            Speler = await ApiClient.GetFromJsonAuthorizedAsync<SpelerDetailResponse>($"api/spelers/{Id.Value}");
+            SeizoenStats = await ApiClient.GetFromJsonAuthorizedAsync<SeizoenSpelerStats>($"api/spelers/{Id.Value}/seizoen");
+
+            if (Speler is not null)
+            {
+                var stats = await ApiClient.GetFromJsonAuthorizedAsync<List<StatistiekResponse>>($"api/spelers/{Id.Value}/stats") ?? new();
+                var wedstrijden = await DataContext.GetWedstrijdenVoorTeamAsync(Speler.TeamId);
+                foreach (var wedstrijd in wedstrijden.OrderByDescending(w => w.Datum))
+                {
+                    var stat = stats.FirstOrDefault(s => s.WedstrijdId == wedstrijd.WedstrijdId);
+                    WedstrijdRows.Add(MapWedstrijd(wedstrijd, stat));
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Fout = $"Spelersprofiel kon niet geladen worden: {ex.Message}";
+        }
+        finally
+        {
+            Laden = false;
+        }
+    }
+
+    private static W MapWedstrijd(WedstrijdResponse wedstrijd, StatistiekResponse? stats)
+    {
+        var uitslag = wedstrijd.ThuisScore is null || wedstrijd.UitScore is null
+            ? wedstrijd.Status.ToString()
+            : $"{wedstrijd.ThuisScore}-{wedstrijd.UitScore}";
+
+        var cls = wedstrijd.Status == WedstrijdStatus.Gespeeld ? "badge-gespeeld" : "badge-afwacht";
+        return new W(
+            wedstrijd.Datum.ToString("dd/MM"),
+            wedstrijd.Tegenstander,
+            uitslag,
+            cls,
+            stats?.GespeeldeMinuten ?? 0,
+            stats?.Goals ?? 0,
+            stats?.Assists ?? 0,
+            $"{stats?.GeleKaarten ?? 0}/{stats?.RodeKaarten ?? 0}");
+    }
+
+    private static string PositieNaam(VastePositie? positie) => positie switch
+    {
+        VastePositie.Keeper => "Keeper",
+        VastePositie.Verdediger => "Verdediger",
+        VastePositie.Middenvelder => "Middenvelder",
+        VastePositie.Aanvaller => "Aanvaller",
+        _ => "Niet gespecificeerd"
+    };
+
+    private sealed record InfoRow(string Label, string Waarde);
+    private sealed record W(string Datum, string Tegen, string Uitslag, string Cls, int Min, int G, int A, string Kaarten);
+}

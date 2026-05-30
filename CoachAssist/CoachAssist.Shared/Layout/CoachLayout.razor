@@ -1,0 +1,100 @@
+@inherits LayoutComponentBase
+@inject CoachAssistDataContext DataContext
+
+<div class="app-shell">
+    <aside class="app-sidebar">
+        <div class="app-sidebar-brand">
+            <div class="brand-logo">CA</div>
+            <div>
+                <div class="app-sidebar-brand-text">CoachAssist</div>
+                <div class="app-sidebar-brand-sub">@ClubNaam</div>
+            </div>
+        </div>
+
+        <nav class="app-sidebar-nav">
+            <NavLink class="app-nav-item" href="/coach" Match="NavLinkMatch.All">
+                <span class="app-nav-icon">H</span> Home
+            </NavLink>
+            <NavLink class="app-nav-item" href="/coach/team">
+                <span class="app-nav-icon">T</span> Mijn ploeg
+            </NavLink>
+            <NavLink class="app-nav-item" href="/coach/kalender">
+                <span class="app-nav-icon">K</span> Kalender
+            </NavLink>
+            <NavLink class="app-nav-item" href="/coach/statistieken">
+                <span class="app-nav-icon">%</span> Statistieken
+            </NavLink>
+            <NavLink class="app-nav-item" href="/coach/verzoeken">
+                <span class="app-nav-icon">A</span> Verzoeken
+                @if (OpenAanvragen > 0)
+                {
+                    <span class="app-nav-badge">@OpenAanvragen</span>
+                }
+            </NavLink>
+            <NavLink class="app-nav-item" href="/coach/meldingen">
+                <span class="app-nav-icon">!</span> Meldingen
+            </NavLink>
+            <NavLink class="app-nav-item" href="/coach/profiel">
+                <span class="app-nav-icon">P</span> Profiel
+            </NavLink>
+        </nav>
+
+        <div class="app-sidebar-user">
+            <div class="avatar avatar-sm" style="background:#374151;">@Initialen</div>
+            <div>
+                <div class="app-sidebar-user-name">@CoachNaam</div>
+                <div class="app-sidebar-user-role">Coach - @TeamNaam</div>
+            </div>
+        </div>
+    </aside>
+
+    <div class="app-main">
+        @Body
+    </div>
+
+    <nav class="bottom-tabs">
+        <NavLink href="/coach" Match="NavLinkMatch.All"><span class="tab-icon">H</span>Home</NavLink>
+        <NavLink href="/coach/team"><span class="tab-icon">T</span>Team</NavLink>
+        <NavLink href="/coach/kalender"><span class="tab-icon">K</span>Kalender</NavLink>
+        <NavLink href="/coach/statistieken"><span class="tab-icon">%</span>Statistieken</NavLink>
+        <NavLink href="/coach/profiel"><span class="tab-icon">P</span>Profiel</NavLink>
+    </nav>
+
+    <CoachAssist.Shared.Components.ToastHost />
+</div>
+
+@code {
+    private string ClubNaam = "Club";
+    private string CoachNaam = "Coach";
+    private string TeamNaam = "Team";
+    private string Initialen = "C";
+    private int OpenAanvragen;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var team = await DataContext.GetTeamVoorCoachAsync();
+            if (team is null)
+            {
+                return;
+            }
+
+            ClubNaam = string.IsNullOrWhiteSpace(team.ClubNaam) ? "Club" : team.ClubNaam;
+            CoachNaam = string.IsNullOrWhiteSpace(team.CoachNaam) ? "Coach" : team.CoachNaam;
+            TeamNaam = string.IsNullOrWhiteSpace(team.Naam) ? "Team" : team.Naam;
+            Initialen = BuildInitialen(CoachNaam);
+            OpenAanvragen = (await DataContext.GetOpenTeamAanvragenAsync(team.TeamId)).Count;
+        }
+        catch
+        {
+            // De pagina zelf toont de concrete laadfout.
+        }
+    }
+
+    private static string BuildInitialen(string naam)
+    {
+        var delen = naam.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return string.Concat(delen.Take(2).Select(d => char.ToUpperInvariant(d[0])));
+    }
+}

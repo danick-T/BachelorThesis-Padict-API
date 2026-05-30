@@ -1,0 +1,131 @@
+@page "/admin/terreinen"
+@layout CoachAssist.Shared.Layout.AdminLayout
+@using CoachAssist.Core.DTOs.Terrein
+@inject Toast Toast
+@inject CoachAssistDataContext DataContext
+
+<PageTitle>Terreinen - CoachAssist</PageTitle>
+
+<div class="app-topbar">
+    <div>
+        <h1>Terreinen</h1>
+        <div class="app-topbar-sub">@Terreinen.Count velden · planning volgt via Agent 2</div>
+    </div>
+    <div class="app-topbar-actions">
+        <button class="btn-secondary" @onclick='() => Toast.Show("Onderhoud loggen komt later")'>Onderhoud loggen</button>
+        <button class="btn-primary" @onclick='() => Toast.Show("Terrein toevoegen komt later")'>+ Terrein toevoegen</button>
+    </div>
+</div>
+
+<div class="app-content">
+    @if (IsLoading)
+    {
+        <div class="card text-sm text-muted">Terreinen worden geladen...</div>
+    }
+    else if (!string.IsNullOrWhiteSpace(ErrorMessage))
+    {
+        <div class="card text-sm" style="background:#FEF2F2; border-color:#FECACA; color:#991B1B;">@ErrorMessage</div>
+    }
+    else if (!Terreinen.Any())
+    {
+        <div class="card text-sm text-muted">Er zijn nog geen terreinen gekoppeld aan deze club.</div>
+    }
+    else
+    {
+        <div style="display:grid; grid-template-columns: 1fr 2fr; gap: 24px;" class="terrein-grid">
+            <div>
+                <div style="display:flex; flex-direction:column; gap: 10px;">
+                    @foreach (var t in Terreinen)
+                    {
+                        <div class="card @(Actief == t ? "selected-card" : "")" style="cursor: pointer; padding: 0;" @onclick="() => Actief = t">
+                            <div style="background: linear-gradient(135deg, #3a7d56, #2c6242); height: 80px; border-radius: 12px 12px 0 0; display:flex; align-items:flex-start; padding: 12px;">
+                                <span class="badge badge-actief">Beschikbaar</span>
+                            </div>
+                            <div style="padding: 12px 14px;">
+                                <div class="fw-600">@t.Naam</div>
+                                <div class="text-xs text-muted">@t.Adres</div>
+                                <div class="text-xs text-muted mt-8">Club ID @t.ClubId</div>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <div class="card mt-16">
+                    <div class="text-xs text-muted fw-600" style="text-transform:uppercase;">@(Actief?.Naam ?? "") · Details</div>
+                    <div class="flex-between text-sm mt-8"><span class="text-muted">Adres</span><span class="fw-600">@Actief?.Adres</span></div>
+                    <div class="flex-between text-sm"><span class="text-muted">Club</span><span class="fw-600">@ClubNaam</span></div>
+                    <div class="flex-between text-sm"><span class="text-muted">Status</span><span class="fw-600">Beschikbaar</span></div>
+                </div>
+            </div>
+
+            <div>
+                <div class="card">
+                    <div class="flex-between">
+                        <div>
+                            <div class="fw-600">Bezetting · @(Actief?.Naam)</div>
+                            <div class="text-xs text-muted">Planningdata is nog niet beschikbaar via de huidige admin-API.</div>
+                        </div>
+                    </div>
+
+                    <div style="display:grid; grid-template-columns: 50px repeat(7, 1fr); gap: 4px; margin-top: 16px;">
+                        <div></div>
+                        @foreach (var d in Dagen)
+                        {
+                            <div class="text-xs text-muted" style="text-align:center;">@d</div>
+                        }
+                        @foreach (var u in Uren)
+                        {
+                            <div class="text-xs text-muted" style="padding-top: 8px;">@u</div>
+                            @for (int i = 0; i < 7; i++)
+                            {
+                                <div style="background:#F9FAFB; border:1px dashed #E5E7EB; border-radius: 6px; min-height: 32px;"></div>
+                            }
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .terrein-grid { grid-template-columns: 320px 1fr; }
+    @@media (max-width: 1100px) { .terrein-grid { grid-template-columns: 1fr; } }
+    .selected-card { border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary); }
+</style>
+
+@code {
+    private bool IsLoading = true;
+    private string? ErrorMessage;
+    private string? ClubNaam;
+    private readonly List<TerreinResponse> Terreinen = new();
+    private TerreinResponse? Actief;
+
+    private readonly string[] Dagen = ["MA", "DI", "WO", "DO", "VR", "ZA", "ZO"];
+    private readonly string[] Uren = ["16:00", "17:00", "18:00", "19:00", "20:00", "21:00"];
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var club = await DataContext.GetEersteClubAsync();
+            if (club is null)
+            {
+                ErrorMessage = "Er kon geen club gevonden worden.";
+                return;
+            }
+
+            ClubNaam = club.Naam;
+            Terreinen.AddRange(await DataContext.GetTerreinenVoorClubAsync(club.ClubId));
+            Actief = Terreinen.FirstOrDefault();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+}

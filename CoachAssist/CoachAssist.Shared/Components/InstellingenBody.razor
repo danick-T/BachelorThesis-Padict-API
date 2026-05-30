@@ -1,0 +1,88 @@
+@inject Toast Toast
+@inject IAuthSession AuthSession
+
+<div class="app-topbar">
+    <h1>Instellingen</h1>
+</div>
+
+<div class="app-content" style="max-width: 640px; margin: 0 auto;">
+    <div class="card flex gap-12" style="align-items:center;">
+        <div class="avatar">@Initialen</div>
+        <div style="flex:1;">
+            <div class="fw-600">@Naam</div>
+            <div class="text-xs text-muted">@Email</div>
+        </div>
+        <a class="btn-secondary" href="/speler/profiel" style="height: 36px; padding: 0 14px;">Bewerken</a>
+    </div>
+
+    <div class="text-xs text-muted mt-16" style="text-transform:uppercase; font-weight:600;">Meldingen</div>
+    <div class="card mt-8" style="padding:0;">
+        @foreach (var t in Toggles)
+        {
+            <div class="flex" style="padding: 14px; border-bottom: 1px solid var(--border); align-items:center; gap:12px;">
+                <div style="width: 24px;">@t.Icon</div>
+                <div style="flex:1;">
+                    <div class="fw-600 text-sm">@t.Label</div>
+                    <div class="text-xs text-muted">@t.Sub</div>
+                </div>
+                <label class="switch"><input type="checkbox" @bind="t.Aan" @bind:after="() => Wijzig(t.Label)" /><span class="slider"></span></label>
+            </div>
+        }
+        <div class="flex-between" style="padding: 14px;">
+            <div class="flex gap-12" style="align-items:center;"><div style="width:24px;">🕐</div>
+                <div>
+                    <div class="fw-600 text-sm">Stille uren</div>
+                    <div class="text-xs text-muted">22:00 – 07:00</div>
+                </div>
+            </div>
+            <span class="text-muted">›</span>
+        </div>
+    </div>
+
+    <div class="text-xs text-muted mt-16" style="text-transform:uppercase; font-weight:600;">App</div>
+    <div class="card mt-8" style="padding:0;">
+        <div class="flex-between" style="padding: 14px; border-bottom: 1px solid var(--border);">
+            <div class="flex gap-12"><div style="width:24px;">👤</div><span class="fw-600 text-sm">Account</span></div><span class="text-muted">›</span>
+        </div>
+        <div class="flex-between" style="padding: 14px; border-bottom: 1px solid var(--border);">
+            <div class="flex gap-12"><div style="width:24px;">🛡️</div><span class="fw-600 text-sm">Privacy</span></div><span class="text-muted">›</span>
+        </div>
+        <div class="flex" style="padding: 14px; border-bottom: 1px solid var(--border); align-items:center;">
+            <div style="width:24px;">🌙</div>
+            <div style="flex:1; margin-left: 12px;">
+                <div class="fw-600 text-sm">Donker thema</div>
+                <div class="text-xs text-muted">Automatisch volgens systeem</div>
+            </div>
+            <label class="switch"><input type="checkbox" @bind="Donker" /><span class="slider"></span></label>
+        </div>
+        <div class="flex-between" style="padding: 14px; border-bottom: 1px solid var(--border);">
+            <div class="flex gap-12"><div style="width:24px;">🌐</div><span class="fw-600 text-sm">Taal</span></div>
+            <div class="flex gap-8"><span class="text-muted text-sm">Nederlands</span><span class="text-muted">›</span></div>
+        </div>
+        <div class="flex-between" style="padding: 14px;">
+            <div class="flex gap-12"><div style="width:24px;">ℹ️</div><span class="fw-600 text-sm">Versie</span></div>
+            <span class="text-muted text-sm">1.0.0-thesis</span>
+        </div>
+    </div>
+</div>
+
+@code {
+    class Tog { public string Icon { get; set; } = ""; public string Label { get; set; } = ""; public string Sub { get; set; } = ""; public bool Aan { get; set; } }
+    private List<Tog> Toggles = new()
+    {
+        new Tog { Icon="🔔", Label="Push-meldingen", Sub="Wedstrijden, trainingen, berichten", Aan=true },
+        new Tog { Icon="📅", Label="Wedstrijdherinneringen", Sub="48u en 2u voor aftrap", Aan=true },
+        new Tog { Icon="🏃", Label="Trainingsherinneringen", Sub="", Aan=true },
+        new Tog { Icon="📊", Label="Statistieken-updates", Sub="Bij nieuwe wedstrijdcijfers", Aan=false },
+    };
+    private bool Donker = false;
+    private string Naam => AuthSession.Gebruiker is null
+        ? "Niet aangemeld"
+        : $"{AuthSession.Gebruiker.Voornaam} {AuthSession.Gebruiker.Achternaam}".Trim();
+    private string Email => AuthSession.Gebruiker?.Email ?? "Geen e-mail beschikbaar";
+    private string Initialen => AuthSession.Gebruiker is null
+        ? "?"
+        : $"{AuthSession.Gebruiker.Voornaam.FirstOrDefault()}{AuthSession.Gebruiker.Achternaam.FirstOrDefault()}".ToUpperInvariant();
+
+    private async Task Wijzig(string label) => await Toast.Show($"\"{label}\" bijgewerkt");
+}

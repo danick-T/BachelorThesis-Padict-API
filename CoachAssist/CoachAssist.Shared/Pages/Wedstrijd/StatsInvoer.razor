@@ -1,0 +1,300 @@
+@page "/coach/stats-invoeren"
+@page "/coach/stats-invoeren/{Id:int}"
+@layout CoachAssist.Shared.Layout.CoachLayout
+@using CoachAssist.Core.DTOs.Statistiek
+@using CoachAssist.Core.DTOs.Wedstrijd
+@using CoachAssist.Core.Enums
+@inject CoachAssistDataContext DataContext
+@inject NavigationManager Nav
+@inject Toast Toast
+
+<PageTitle>Statistieken invoeren - CoachAssist</PageTitle>
+
+<div class="app-topbar">
+    <div>
+        <div class="text-xs text-muted">Kalender - @WedstrijdDatum</div>
+        <h1>Statistieken invoeren</h1>
+        <div class="app-topbar-sub">@WedstrijdTitel</div>
+    </div>
+    <div class="app-topbar-actions">
+        <button class="btn-secondary" @onclick="Annuleren" disabled="@IsSaving">Annuleren</button>
+        <button class="btn-primary" @onclick="AllesOpslaan" disabled="@(IsLoading || IsSaving || Wedstrijd is null)">@(IsSaving ? "Opslaan..." : "Alles opslaan")</button>
+    </div>
+</div>
+
+<div class="app-content">
+    @if (IsLoading)
+    {
+        <div class="card text-sm text-muted">Wedstrijdstatistieken worden geladen...</div>
+    }
+    else if (!string.IsNullOrWhiteSpace(ErrorMessage))
+    {
+        <div class="card text-sm" style="background:#FEF2F2; border-color:#FECACA; color:#991B1B;">@ErrorMessage</div>
+    }
+    else
+    {
+        <div class="row-2col">
+            <div>
+                <div class="card">
+                    <div class="text-xs text-muted fw-600" style="text-transform:uppercase;">Eindstand</div>
+                    <div class="flex" style="align-items:center; justify-content: space-around; gap:16px; margin-top: 12px;">
+                        <div style="text-align:center;">
+                            <div class="text-xs text-muted">Thuis - @TeamNaam</div>
+                            <div class="flex gap-8" style="align-items:center; justify-content:center; margin-top:8px;">
+                                <button class="counter-btn" @onclick="() => Thuis = Math.Max(0, Thuis - 1)">-</button>
+                                <div style="font-size:32px; font-weight:700; min-width: 40px;">@Thuis</div>
+                                <button class="counter-btn" @onclick="() => Thuis++">+</button>
+                            </div>
+                        </div>
+                        <div style="color: var(--text-muted); font-size:24px;">-</div>
+                        <div style="text-align:center;">
+                            <div class="text-xs text-muted">Uit - @Tegenstander</div>
+                            <div class="flex gap-8" style="align-items:center; justify-content:center; margin-top:8px;">
+                                <button class="counter-btn" @onclick="() => Uit = Math.Max(0, Uit - 1)">-</button>
+                                <div style="font-size:32px; font-weight:700; min-width: 40px;">@Uit</div>
+                                <button class="counter-btn" @onclick="() => Uit++">+</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mt-16" style="padding: 0;">
+                    <div class="flex stats-header" style="padding: 12px 16px; font-size: 11px; color: var(--text-muted); text-transform:uppercase; border-bottom: 1px solid var(--border); align-items:center;">
+                        <div style="flex: 2;">Speler - positie</div>
+                        <div style="flex: 1; text-align:center;">Goals</div>
+                        <div style="flex: 1; text-align:center;">Assists</div>
+                        <div style="flex: 1; text-align:center;">Geel</div>
+                        <div style="flex: 1; text-align:center;">Rood</div>
+                        <div style="width:60px; text-align:center;">Min</div>
+                    </div>
+                    @foreach (var s in Spelers)
+                    {
+                        <div class="flex stats-row-item" style="padding: 12px 16px; border-bottom: 1px solid var(--border); align-items:center; gap:8px;">
+                            <div style="flex: 2; display:flex; align-items:center; gap:8px;">
+                                <div class="avatar avatar-sm">@s.Init<span class="avatar-num">@s.Nr</span></div>
+                                <div>
+                                    <div class="text-sm fw-600">@s.Naam</div>
+                                    <div class="text-xs text-muted">@s.Pos</div>
+                                </div>
+                            </div>
+                            <div style="flex: 1;" class="counter-cell"><button class="counter-btn" @onclick="() => s.Goals = Math.Max(0, s.Goals - 1)">-</button><span class="counter-val goal-val">@s.Goals</span><button class="counter-btn" @onclick="() => s.Goals++">+</button></div>
+                            <div style="flex: 1;" class="counter-cell"><button class="counter-btn" @onclick="() => s.Assists = Math.Max(0, s.Assists - 1)">-</button><span class="counter-val assist-val">@s.Assists</span><button class="counter-btn" @onclick="() => s.Assists++">+</button></div>
+                            <div style="flex: 1;" class="counter-cell"><button class="counter-btn" @onclick="() => s.Geel = Math.Max(0, s.Geel - 1)">-</button><span class="counter-val yellow-val">@s.Geel</span><button class="counter-btn" @onclick="() => s.Geel++">+</button></div>
+                            <div style="flex: 1;" class="counter-cell"><button class="counter-btn" @onclick="() => s.Rood = Math.Max(0, s.Rood - 1)">-</button><span class="counter-val red-val">@s.Rood</span><button class="counter-btn" @onclick="() => s.Rood++">+</button></div>
+                            <input class="input" style="width: 60px; height: 36px; padding: 0 6px; text-align:center;" type="number" min="0" @bind="s.Minuten" />
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div>
+                <div class="card">
+                    <div class="text-xs text-muted fw-600" style="text-transform:uppercase;">Match-totalen</div>
+                    <div class="flex-between text-sm mt-12"><span>Goals</span><span class="fw-600">@TotaalGoals</span></div>
+                    <div class="flex-between text-sm"><span>Assists</span><span class="fw-600">@TotaalAssists</span></div>
+                    <div class="flex-between text-sm"><span>Gele kaarten</span><span class="fw-600">@TotaalGeel</span></div>
+                    <div class="flex-between text-sm"><span>Rode kaarten</span><span class="fw-600">@TotaalRood</span></div>
+                    <div class="flex-between text-sm"><span class="text-muted">Spelers ingezet</span><span class="fw-600">@(Spelers.Count(p => p.Minuten > 0)) van @Spelers.Count</span></div>
+                </div>
+                <div class="card mt-16">
+                    <div class="text-xs text-muted fw-600" style="text-transform:uppercase;">Match-resultaat</div>
+                    <div class="badge badge-gespeeld mt-12">@Resultaat</div>
+                    <div class="text-xs text-muted mt-12">Na opslaan zijn de statistieken zichtbaar voor spelers.</div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .counter-btn {
+        width: 28px; height: 28px; border-radius: 8px;
+        background: var(--primary); color: #fff; border: none;
+        font-size: 16px; font-weight: 600;
+    }
+    .counter-cell { display: flex; align-items: center; gap: 6px; justify-content: center; }
+    .counter-val {
+        min-width: 28px; padding: 4px 8px; text-align: center; font-weight: 600;
+        border-radius: 6px; background: #F3F4F6;
+    }
+    .goal-val { background: #EFF6FF; color: #3B82F6; }
+    .assist-val { background: #DCFCE7; color: #22C55E; }
+    .yellow-val { background: #FEF3C7; color: #D97706; }
+    .red-val { background: #FEE2E2; color: var(--danger); }
+
+    @@media (max-width: 700px) {
+        .stats-header { display: none; }
+        .stats-row-item { flex-wrap: wrap; }
+        .stats-row-item > div { flex: 1 0 30% !important; }
+    }
+</style>
+
+@code {
+    [Parameter] public int? Id { get; set; }
+
+    private sealed class SpelerStat
+    {
+        public int SpelerId { get; set; }
+        public int Nr { get; set; }
+        public string Init { get; set; } = "";
+        public string Naam { get; set; } = "";
+        public string Pos { get; set; } = "";
+        public int Goals { get; set; }
+        public int Assists { get; set; }
+        public int Geel { get; set; }
+        public int Rood { get; set; }
+        public int Minuten { get; set; }
+    }
+
+    private bool IsLoading = true;
+    private bool IsSaving;
+    private string? ErrorMessage;
+    private string TeamNaam = "Mijn team";
+    private string Tegenstander = "Tegenstander";
+    private WedstrijdDetailResponse? Wedstrijd;
+    private int Thuis;
+    private int Uit;
+    private readonly List<SpelerStat> Spelers = new();
+
+    private string WedstrijdDatum => Wedstrijd is null ? "Wedstrijd" : Wedstrijd.Datum.ToString("dd/MM/yyyy");
+    private string WedstrijdTitel => Wedstrijd is null ? "Selecteer een wedstrijd" : $"{TeamNaam} vs {Tegenstander}";
+    private int TotaalGoals => Spelers.Sum(s => s.Goals);
+    private int TotaalAssists => Spelers.Sum(s => s.Assists);
+    private int TotaalGeel => Spelers.Sum(s => s.Geel);
+    private int TotaalRood => Spelers.Sum(s => s.Rood);
+    private string Resultaat => Thuis > Uit ? "Gewonnen" : Thuis < Uit ? "Verloren" : "Gelijk";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var team = await DataContext.GetTeamVoorCoachAsync();
+            if (team is null)
+            {
+                ErrorMessage = "Er kon geen team gevonden worden voor deze coach.";
+                return;
+            }
+
+            TeamNaam = team.Naam;
+            var wedstrijdId = Id ?? await KiesStandaardWedstrijdId(team.TeamId);
+            if (wedstrijdId is null)
+            {
+                ErrorMessage = "Er is nog geen wedstrijd om statistieken voor in te voeren.";
+                return;
+            }
+
+            Wedstrijd = await DataContext.GetWedstrijdDetailAsync(wedstrijdId.Value);
+            if (Wedstrijd is null)
+            {
+                ErrorMessage = "De gekozen wedstrijd kon niet geladen worden.";
+                return;
+            }
+
+            Tegenstander = Wedstrijd.Tegenstander;
+            Thuis = Wedstrijd.ThuisScore ?? 0;
+            Uit = Wedstrijd.UitScore ?? 0;
+
+            var spelers = await DataContext.GetSpelersVoorTeamAsync(Wedstrijd.TeamId);
+            var stats = await DataContext.GetStatistiekenVoorWedstrijdAsync(Wedstrijd.WedstrijdId);
+            var statsPerSpeler = stats.ToDictionary(s => s.SpelerId);
+
+            foreach (var speler in spelers.OrderBy(s => s.Rugnummer ?? int.MaxValue).ThenBy(s => s.Achternaam))
+            {
+                statsPerSpeler.TryGetValue(speler.SpelerId, out var stat);
+                Spelers.Add(new SpelerStat
+                {
+                    SpelerId = speler.SpelerId,
+                    Nr = speler.Rugnummer ?? speler.SpelerId,
+                    Init = Initialen(speler.Voornaam, speler.Achternaam),
+                    Naam = $"{speler.Voornaam} {speler.Achternaam}".Trim(),
+                    Pos = PositieNaam(speler.VastePositie),
+                    Goals = stat?.Goals ?? 0,
+                    Assists = stat?.Assists ?? 0,
+                    Geel = stat?.GeleKaarten ?? 0,
+                    Rood = stat?.RodeKaarten ?? 0,
+                    Minuten = stat?.GespeeldeMinuten ?? 0
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task<int?> KiesStandaardWedstrijdId(int teamId)
+    {
+        var wedstrijden = await DataContext.GetWedstrijdenVoorTeamAsync(teamId);
+        return wedstrijden
+            .OrderByDescending(w => w.Status == WedstrijdStatus.Gespeeld)
+            .ThenByDescending(w => w.Datum)
+            .ThenByDescending(w => w.StartTijd)
+            .Select(w => (int?)w.WedstrijdId)
+            .FirstOrDefault();
+    }
+
+    private async Task AllesOpslaan()
+    {
+        if (Wedstrijd is null)
+        {
+            return;
+        }
+
+        IsSaving = true;
+        try
+        {
+            await DataContext.BewaarWedstrijdStatistiekenAsync(
+                Wedstrijd.WedstrijdId,
+                new BulkStatistiekenRequest
+                {
+                    ThuisScore = Thuis,
+                    UitScore = Uit,
+                    Statistieken = Spelers.Select(s => new SpelerStatistiekDto
+                    {
+                        SpelerId = s.SpelerId,
+                        Goals = s.Goals,
+                        Assists = s.Assists,
+                        GeleKaarten = s.Geel,
+                        RodeKaarten = s.Rood,
+                        GespeeldeMinuten = Math.Max(0, s.Minuten)
+                    }).ToList()
+                });
+
+            await Toast.Show("Statistieken opgeslagen", "success");
+            Nav.NavigateTo($"/coach/wedstrijd/{Wedstrijd.WedstrijdId}");
+        }
+        catch (Exception ex)
+        {
+            await Toast.Show(ex.Message, "error", 3500);
+        }
+        finally
+        {
+            IsSaving = false;
+        }
+    }
+
+    private void Annuleren()
+    {
+        Nav.NavigateTo(Wedstrijd is null ? "/coach" : $"/coach/wedstrijd/{Wedstrijd.WedstrijdId}");
+    }
+
+    private static string Initialen(string voornaam, string achternaam)
+    {
+        var eerste = string.IsNullOrWhiteSpace(voornaam) ? "" : voornaam[..1];
+        var tweede = string.IsNullOrWhiteSpace(achternaam) ? "" : achternaam[..1];
+        return $"{eerste}{tweede}".ToUpperInvariant();
+    }
+
+    private static string PositieNaam(VastePositie? positie) => positie switch
+    {
+        VastePositie.Keeper => "Keeper",
+        VastePositie.Verdediger => "Verdediger",
+        VastePositie.Middenvelder => "Middenvelder",
+        VastePositie.Aanvaller => "Aanvaller",
+        _ => "Niet gespecificeerd"
+    };
+}

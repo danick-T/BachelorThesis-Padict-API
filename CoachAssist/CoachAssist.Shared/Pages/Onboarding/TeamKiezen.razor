@@ -1,0 +1,136 @@
+@page "/onboarding/team"
+@layout CoachAssist.Shared.Layout.AuthLayout
+@using CoachAssist.Core.DTOs.Club
+@using CoachAssist.Core.DTOs.Team
+@inject NavigationManager Nav
+@inject CoachAssistDataContext DataContext
+@inject Toast Toast
+
+<PageTitle>Kies je team - CoachAssist</PageTitle>
+
+<div class="onboarding-shell">
+    <div class="onboarding-card">
+        <div style="display:flex; gap:6px; align-items:center; margin-bottom:12px;">
+            <span style="flex:1; height:4px; background: var(--primary); border-radius:999px;"></span>
+            <span style="flex:1; height:4px; background: var(--primary); border-radius:999px;"></span>
+            <span class="text-xs text-muted">Stap 2 van 2</span>
+        </div>
+        <h1 style="font-size: 24px; font-weight: 700;">Kies je team</h1>
+
+        @if (Club is not null)
+        {
+            <div class="entity-card mt-12" style="background: var(--primary); color: #fff; border-color: var(--primary);">
+                <div class="entity-logo">@Kort(Club.Naam)</div>
+                <div style="flex:1;">
+                    <div class="fw-600">@Club.Naam</div>
+                    <div class="text-xs" style="opacity:.7;">@Club.Stad</div>
+                </div>
+                <a class="text-sm fw-600" href="/onboarding/club" style="color: var(--highlight);">Wijzigen</a>
+            </div>
+        }
+
+        @if (IsLoading)
+        {
+            <div class="card mt-16 text-sm text-muted">Teams worden geladen...</div>
+        }
+        else if (!string.IsNullOrWhiteSpace(ErrorMessage))
+        {
+            <div class="card mt-16 text-sm" style="background:#FEF2F2; border-color:#FECACA; color:#991B1B;">@ErrorMessage</div>
+        }
+        else
+        {
+            <div class="text-xs text-muted mt-16" style="text-transform:uppercase; font-weight:600;">Alle teams</div>
+            <div style="display:flex; flex-direction:column; gap:8px; margin-top:8px;">
+                @foreach (var t in Teams)
+                {
+                    <div class="entity-card">
+                        <div class="entity-logo">@Kort(t.Naam)</div>
+                        <div style="flex:1;">
+                            <div class="fw-600">@t.Naam</div>
+                            <div class="text-xs text-muted">@t.Seizoen @(!string.IsNullOrWhiteSpace(t.CoachNaam) ? $"- {t.CoachNaam}" : "")</div>
+                        </div>
+                        <button class="btn-secondary" style="height:36px; padding:0 14px;" @onclick="() => Aanvragen(t)">Aanvragen</button>
+                    </div>
+                }
+                @if (Teams.Count == 0)
+                {
+                    <div class="text-sm text-muted" style="text-align:center; padding: 24px;">Er zijn nog geen teams voor deze club.</div>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+<style>
+    .onboarding-shell {
+        min-height: 100vh; background: var(--bg);
+        padding: 24px 16px;
+        display: flex; align-items: flex-start; justify-content: center;
+    }
+    .onboarding-card { background: #fff; border-radius: 16px; padding: 24px; max-width: 520px; width: 100%; box-shadow: 0 4px 12px rgba(0,0,0,0.04); }
+</style>
+
+@code {
+    [SupplyParameterFromQuery] public int? ClubId { get; set; }
+
+    private bool IsLoading = true;
+    private bool IsSubmitting;
+    private string? ErrorMessage;
+    private ClubResponse? Club;
+    private List<TeamResponse> Teams = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (ClubId is null)
+        {
+            ErrorMessage = "Kies eerst een club.";
+            IsLoading = false;
+            return;
+        }
+
+        try
+        {
+            var clubs = await DataContext.ZoekClubsAsync(null);
+            Club = clubs.FirstOrDefault(c => c.ClubId == ClubId.Value);
+            Teams = await DataContext.GetTeamLijstVoorClubAsync(ClubId.Value);
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task Aanvragen(TeamResponse team)
+    {
+        if (IsSubmitting)
+        {
+            return;
+        }
+
+        IsSubmitting = true;
+        try
+        {
+            await DataContext.MaakTeamAanvraagAsync(team.TeamId);
+            await Toast.Show($"Aanvraag verzonden voor {team.Naam}", "success");
+            Nav.NavigateTo("/onboarding/wachten");
+        }
+        catch (Exception ex)
+        {
+            await Toast.Show(ex.Message, "error", 3500);
+        }
+        finally
+        {
+            IsSubmitting = false;
+        }
+    }
+
+    private static string Kort(string naam)
+    {
+        var woorden = naam.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return string.Concat(woorden.Take(2).Select(w => w[0])).ToUpperInvariant();
+    }
+}

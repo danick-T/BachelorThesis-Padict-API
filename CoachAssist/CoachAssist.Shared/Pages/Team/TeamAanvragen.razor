@@ -1,0 +1,177 @@
+@page "/coach/verzoeken"
+@layout CoachAssist.Shared.Layout.CoachLayout
+@using CoachAssist.Core.DTOs.Aanvraag
+@using CoachAssist.Core.Enums
+@inject Toast Toast
+@inject CoachAssistDataContext DataContext
+@inject ICoachAssistApiClient Api
+
+<PageTitle>Teamaanvragen - CoachAssist</PageTitle>
+
+<div class="app-topbar">
+    <div>
+        <div class="text-xs text-muted">@(TeamNaam ?? "Mijn team")</div>
+        <h1>Teamaanvragen</h1>
+    </div>
+</div>
+
+<div class="app-content" style="max-width: 760px; margin: 0 auto;">
+    @if (IsLoading)
+    {
+        <div class="card text-sm text-muted">Aanvragen worden geladen...</div>
+    }
+    else if (!string.IsNullOrWhiteSpace(ErrorMessage))
+    {
+        <div class="card text-sm" style="background:#FEF2F2; border-color:#FECACA; color:#991B1B;">@ErrorMessage</div>
+    }
+    else
+    {
+        @if (Aanvragen.Count(a => a.Status == AanvraagStatus.InAfwachting) > 0)
+        {
+            <div class="card" style="background:#FEF3C7; border-color:#FDE68A; display:flex; align-items:center; gap:12px;">
+                <span class="badge badge-afwacht" style="width:28px;height:28px;padding:0;border-radius:50%;justify-content:center;">@Aanvragen.Count(a => a.Status == AanvraagStatus.InAfwachting)</span>
+                <span class="text-sm">Spelers wachten op je beslissing. Probeer binnen 48u te antwoorden.</span>
+            </div>
+        }
+
+        <div class="chips mt-16">
+            <button class="chip @(Tab == AanvraagStatus.InAfwachting ? "active" : "")" @onclick="() => Tab = AanvraagStatus.InAfwachting">In afwachting <span class="chip-count">@Aanvragen.Count(a => a.Status == AanvraagStatus.InAfwachting)</span></button>
+            <button class="chip @(Tab == AanvraagStatus.Goedgekeurd ? "active" : "")" @onclick="() => Tab = AanvraagStatus.Goedgekeurd">Goedgekeurd <span class="chip-count">@Aanvragen.Count(a => a.Status == AanvraagStatus.Goedgekeurd)</span></button>
+            <button class="chip @(Tab == AanvraagStatus.Geweigerd ? "active" : "")" @onclick="() => Tab = AanvraagStatus.Geweigerd">Geweigerd <span class="chip-count">@Aanvragen.Count(a => a.Status == AanvraagStatus.Geweigerd)</span></button>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:10px; margin-top:16px;">
+            @foreach (var a in Aanvragen.Where(x => x.Status == Tab))
+            {
+                <div class="card">
+                    <div class="flex gap-12" style="align-items:flex-start;">
+                        <div class="avatar">@Initialen(a.SpelerNaam)</div>
+                        <div style="flex:1;">
+                            <div class="flex-between">
+                                <div>
+                                    <div class="fw-600">@a.SpelerNaam</div>
+                                    <div class="text-xs text-muted">@a.TeamNaam</div>
+                                </div>
+                                <div class="text-xs text-muted">@RelatieveDatum(a.DatumAanvraag)</div>
+                            </div>
+                        </div>
+                    </div>
+                    @if (a.Status == AanvraagStatus.InAfwachting)
+                    {
+                        <div class="flex gap-8 mt-12">
+                            <button class="btn-danger" style="flex:1; height:40px;" disabled="@IsProcessing" @onclick="() => Weiger(a)">Weigeren</button>
+                            <button class="btn-primary" style="flex:1; height:40px;" disabled="@IsProcessing" @onclick="() => Goedkeur(a)">Toevoegen aan team</button>
+                        </div>
+                    }
+                </div>
+            }
+            @if (!Aanvragen.Any(a => a.Status == Tab))
+            {
+                <div class="text-sm text-muted" style="text-align:center; padding:30px;">Geen aanvragen in deze categorie.</div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private AanvraagStatus Tab = AanvraagStatus.InAfwachting;
+    private bool IsLoading = true;
+    private bool IsProcessing;
+    private string? ErrorMessage;
+    private string? TeamNaam;
+    private readonly List<TeamAanvraagResponse> Aanvragen = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LaadAanvragen();
+    }
+
+    private async Task LaadAanvragen()
+    {
+        IsLoading = true;
+        ErrorMessage = null;
+
+        try
+        {
+            var team = await DataContext.GetTeamVoorCoachAsync();
+            if (team is null)
+            {
+                ErrorMessage = "Er kon geen team gevonden worden voor deze coach.";
+                return;
+            }
+
+            TeamNaam = team.Naam;
+            Aanvragen.Clear();
+            Aanvragen.AddRange(await DataContext.GetOpenTeamAanvragenAsync(team.TeamId));
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task Goedkeur(TeamAanvraagResponse aanvraag)
+    {
+        await Verwerk(aanvraag, "goedkeuren", AanvraagStatus.Goedgekeurd, "toegevoegd aan team", "success");
+    }
+
+    private async Task Weiger(TeamAanvraagResponse aanvraag)
+    {
+        await Verwerk(aanvraag, "weigeren", AanvraagStatus.Geweigerd, "geweigerd", "error");
+    }
+
+    private async Task Verwerk(
+        TeamAanvraagResponse aanvraag,
+        string actie,
+        AanvraagStatus nieuweStatus,
+        string toastTekst,
+        string toastType)
+    {
+        IsProcessing = true;
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Put, $"api/aanvragen/team/{aanvraag.AanvraagId}/{actie}");
+            using var response = await Api.SendAuthorizedAsync(request);
+            if (!response.IsSuccessStatusCode)
+            {
+                ErrorMessage = "De aanvraag kon niet verwerkt worden.";
+                return;
+            }
+
+            aanvraag.Status = nieuweStatus;
+            await Toast.Show($"{aanvraag.SpelerNaam} {toastTekst}", toastType);
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            IsProcessing = false;
+        }
+    }
+
+    private static string Initialen(string naam)
+    {
+        var delen = naam.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return string.Concat(delen.Take(2).Select(d => d[0])).ToUpperInvariant();
+    }
+
+    private static string RelatieveDatum(DateTime? datum)
+    {
+        if (datum is null)
+        {
+            return "";
+        }
+
+        var verschil = DateTime.UtcNow - datum.Value.ToUniversalTime();
+        if (verschil.TotalHours < 1) return "net ontvangen";
+        if (verschil.TotalHours < 24) return $"{(int)verschil.TotalHours} uur geleden";
+        if (verschil.TotalDays < 7) return $"{(int)verschil.TotalDays} dagen geleden";
+        return datum.Value.ToString("dd/MM/yyyy");
+    }
+}

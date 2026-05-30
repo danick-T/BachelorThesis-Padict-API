@@ -1,0 +1,161 @@
+@page "/coach/wedstrijd/nieuw"
+@layout CoachAssist.Shared.Layout.CoachLayout
+@using CoachAssist.Core.DTOs.Terrein
+@using CoachAssist.Core.DTOs.Wedstrijd
+@inject NavigationManager Nav
+@inject Toast Toast
+@inject CoachAssistDataContext DataContext
+@inject ICoachAssistApiClient Api
+
+<PageTitle>Nieuwe wedstrijd - CoachAssist</PageTitle>
+
+<div class="app-topbar">
+    <div class="flex gap-8" style="align-items:center;">
+        <button class="icon-btn" @onclick='() => Nav.NavigateTo("/coach/kalender")'>x</button>
+        <h1>Nieuwe wedstrijd</h1>
+    </div>
+    <div class="app-topbar-actions">
+        <button class="btn-secondary" disabled="@IsSaving" @onclick="Opslaan">Opslaan</button>
+    </div>
+</div>
+
+<div class="app-content" style="max-width: 640px; margin: 0 auto;">
+    @if (IsLoading)
+    {
+        <div class="card text-sm text-muted">Formulier wordt geladen...</div>
+    }
+    else if (!string.IsNullOrWhiteSpace(ErrorMessage))
+    {
+        <div class="card text-sm" style="background:#FEF2F2; border-color:#FECACA; color:#991B1B;">@ErrorMessage</div>
+    }
+
+    <div class="field">
+        <label class="field-label">Locatie</label>
+        <div class="flex gap-8" style="margin-top: 8px;">
+            <button class="chip @(Thuis ? "active" : "")" style="flex:1; height:44px;" @onclick="() => Thuis = true">Thuis</button>
+            <button class="chip @(!Thuis ? "active" : "")" style="flex:1; height:44px;" @onclick="() => Thuis = false">Uit</button>
+        </div>
+    </div>
+
+    <div class="field"><label class="field-label">Tegenstander</label><input class="input" placeholder="Bv. SK Lot" @bind="Tegenstander" /></div>
+
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        <div class="field"><label class="field-label">Datum</label><input class="input" type="date" @bind="Datum" /></div>
+        <div class="field"><label class="field-label">Aftrap</label><input class="input" type="time" @bind="Aftrap" /></div>
+    </div>
+
+    <div class="field">
+        <label class="field-label">Terrein</label>
+        <select class="input" @bind="TerreinId" disabled="@(!Terreinen.Any())">
+            @foreach (var terrein in Terreinen)
+            {
+                <option value="@terrein.TerreinId">@terrein.Naam · @terrein.Adres</option>
+            }
+        </select>
+    </div>
+
+    <div class="field">
+        <label class="field-label">Wedstrijdtype</label>
+        <div class="chips" style="margin-top: 8px;">
+            @foreach (var t in Types)
+            {
+                <button class="chip @(Type == t ? "active" : "")" @onclick="() => Type = t">@t</button>
+            }
+        </div>
+    </div>
+
+    <div class="card" style="margin-top: 16px; display:flex; align-items:center; gap: 12px;">
+        <div class="avatar" style="background:#DCFCE7; color: var(--accent);">!</div>
+        <div style="flex:1;">
+            <div class="fw-600 text-sm">Spelers verwittigen</div>
+            <div class="text-xs text-muted">Stuurt melding 48u vooraf zodra meldingen actief zijn</div>
+        </div>
+        <label class="switch"><input type="checkbox" @bind="Verwittigen" /><span class="slider"></span></label>
+    </div>
+
+    <div class="field"><label class="field-label">Notities (optioneel)</label>
+        <textarea class="input" rows="3" style="height:auto; padding: 12px 14px;" placeholder="Bv. verzamel 13:45" @bind="Notities"></textarea>
+    </div>
+
+    <button class="btn-primary mt-16" style="width:100%;" disabled="@(IsSaving || TeamId is null || TerreinId is null || string.IsNullOrWhiteSpace(Tegenstander))" @onclick="Opslaan">Wedstrijd aanmaken</button>
+</div>
+
+@code {
+    private bool Thuis = true;
+    private string Tegenstander = "";
+    private DateTime Datum = DateTime.Today.AddDays(3);
+    private TimeOnly Aftrap = new(14, 30);
+    private int? TeamId;
+    private int? TerreinId;
+    private string Type = "Competitie";
+    private bool Verwittigen = true;
+    private string Notities = "";
+    private bool IsLoading = true;
+    private bool IsSaving;
+    private string? ErrorMessage;
+    private readonly string[] Types = ["Competitie", "Beker", "Vriendschappelijk", "Toernooi"];
+    private readonly List<TerreinResponse> Terreinen = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var team = await DataContext.GetTeamVoorCoachAsync();
+            if (team is null)
+            {
+                ErrorMessage = "Er kon geen team gevonden worden voor deze coach.";
+                return;
+            }
+
+            TeamId = team.TeamId;
+            Terreinen.AddRange(await DataContext.GetTerreinenVoorClubAsync(team.ClubId));
+            TerreinId = Terreinen.FirstOrDefault()?.TerreinId;
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task Opslaan()
+    {
+        if (TeamId is null || TerreinId is null || string.IsNullOrWhiteSpace(Tegenstander)) return;
+
+        IsSaving = true;
+        ErrorMessage = null;
+
+        try
+        {
+            var request = new MaakWedstrijdRequest
+            {
+                TeamId = TeamId.Value,
+                TerreinId = TerreinId.Value,
+                Datum = Datum,
+                StartTijd = Aftrap.ToTimeSpan(),
+                Tegenstander = Tegenstander.Trim()
+            };
+
+            using var response = await Api.PostAsJsonAuthorizedAsync("api/wedstrijden", request);
+            if (!response.IsSuccessStatusCode)
+            {
+                ErrorMessage = "Wedstrijd kon niet aangemaakt worden.";
+                return;
+            }
+
+            await Toast.Show("Wedstrijd aangemaakt", "success");
+            Nav.NavigateTo("/coach/kalender");
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            IsSaving = false;
+        }
+    }
+}

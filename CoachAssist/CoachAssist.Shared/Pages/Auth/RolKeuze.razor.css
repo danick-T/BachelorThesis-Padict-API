@@ -1,0 +1,385 @@
+.role-select-page {
+    --ca-primary: #1e3a2f;
+    --ca-primary-light: #2d5a40;
+    --ca-accent: #4caf50;
+    --ca-success: #22c55e;
+    --ca-background: #f4f6f5;
+    --ca-surface: #ffffff;
+    --ca-text: #1a1a1a;
+    --ca-muted: #6b7280;
+    --ca-border: #e5e7eb;
+
+    min-height: 100vh;
+    color: var(--ca-text);
+    font-family: Inter, "Segoe UI", sans-serif;
+    background: var(--ca-background);
+}
+
+.role-select-header {
+    height: 64px;
+    display: flex;
+    align-items: center;
+    padding: 0 32px;
+    background: var(--ca-surface);
+    border-bottom: 1px solid var(--ca-border);
+}
+
+.brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--ca-text);
+    font-size: 15px;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.brand-mark {
+    width: 32px;
+    height: 32px;
+    display: inline-grid;
+    place-items: center;
+    border-radius: 8px;
+    color: var(--ca-text);
+    background: #f4c430;
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.role-select-shell {
+    width: min(940px, calc(100% - 48px));
+    margin: 0 auto;
+    padding: 112px 0 72px;
+}
+
+.progress-row {
+    display: grid;
+    grid-template-columns: minmax(72px, 1fr) minmax(72px, 1fr) auto;
+    align-items: center;
+    gap: 16px;
+    max-width: 520px;
+    margin-bottom: 30px;
+}
+
+.progress-line {
+    height: 4px;
+    border-radius: 999px;
+    background: var(--ca-primary);
+}
+
+.step-label {
+    color: var(--ca-muted);
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.intro {
+    margin-bottom: 28px;
+}
+
+.intro h1 {
+    margin: 0 0 8px;
+    color: var(--ca-text);
+    font-size: 28px;
+    line-height: 1.15;
+    font-weight: 700;
+    letter-spacing: 0;
+}
+
+.intro p {
+    margin: 0;
+    color: var(--ca-muted);
+    font-size: 15px;
+    line-height: 1.5;
+}
+
+.role-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.role-card {
+    position: relative;
+    min-height: 168px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 18px;
+    padding: 24px;
+    border: 1px solid var(--ca-border);
+    border-radius: 8px;
+    color: var(--ca-text);
+    background: var(--ca-surface);
+    box-shadow: 0 1px 2px rgba(26, 26, 26, 0.06);
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.role-card:hover {
+    border-color: rgba(30, 58, 47, 0.4);
+    box-shadow: 0 8px 24px rgba(30, 58, 47, 0.08);
+    transform: translateY(-1px);
+}
+
+.role-card:focus-visible {
+    outline: 3px solid rgba(76, 175, 80, 0.28);
+    outline-offset: 3px;
+}
+
+.role-card.selected {
+    border-color: var(--ca-primary);
+    box-shadow: 0 8px 20px rgba(30, 58, 47, 0.14);
+}
+
+.role-icon {
+    width: 48px;
+    height: 48px;
+    display: inline-grid;
+    place-items: center;
+    border-radius: 10px;
+    color: #ffffff;
+    position: relative;
+}
+
+.role-icon.admin {
+    background: #374151;
+}
+
+.role-icon.coach {
+    background: var(--ca-primary);
+}
+
+.role-icon.player {
+    background: var(--ca-accent);
+}
+
+.role-icon.admin::before {
+    content: "";
+    width: 18px;
+    height: 21px;
+    border: 2px solid #ffffff;
+    border-radius: 10px 10px 8px 8px;
+    clip-path: polygon(50% 0, 100% 18%, 88% 76%, 50% 100%, 12% 76%, 0 18%);
+}
+
+.role-icon.coach::before {
+    content: "";
+    width: 17px;
+    height: 22px;
+    border: 2px solid #ffffff;
+    border-radius: 3px;
+}
+
+.role-icon.coach::after {
+    content: "";
+    position: absolute;
+    top: 13px;
+    width: 9px;
+    height: 2px;
+    background: #ffffff;
+    box-shadow: 0 5px 0 #ffffff;
+}
+
+.role-icon.player::before {
+    content: "";
+    width: 18px;
+    height: 13px;
+    border: 2px solid #ffffff;
+    border-left-width: 4px;
+    border-radius: 2px 5px 5px 2px;
+    transform: translateX(1px);
+}
+
+.role-icon.player::after {
+    content: "";
+    position: absolute;
+    left: 17px;
+    top: 28px;
+    width: 2px;
+    height: 8px;
+    background: #ffffff;
+}
+
+.role-content {
+    display: grid;
+    gap: 7px;
+}
+
+.role-title {
+    color: var(--ca-text);
+    font-size: 18px;
+    line-height: 1.2;
+    font-weight: 600;
+}
+
+.role-description {
+    color: var(--ca-muted);
+    font-size: 15px;
+    line-height: 1.45;
+    font-weight: 400;
+}
+
+.selected-badge {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    padding: 5px 9px;
+    border-radius: 999px;
+    color: #16a34a;
+    background: #dcfce7;
+    font-size: 12px;
+    line-height: 1;
+    font-weight: 600;
+}
+
+.success-message {
+    margin: 20px 0 0;
+    padding: 13px 16px;
+    border-radius: 8px;
+    color: #16a34a;
+    background: #dcfce7;
+    font-size: 15px;
+    font-weight: 500;
+}
+
+.actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-top: 36px;
+}
+
+.back-button,
+.create-account-button {
+    min-height: 48px;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.back-button {
+    border: 0;
+    color: var(--ca-muted);
+    background: transparent;
+    padding: 0;
+}
+
+.back-button:hover {
+    color: var(--ca-primary);
+}
+
+.create-account-button {
+    min-width: 190px;
+    border: 0;
+    color: #ffffff;
+    background: var(--ca-primary);
+    padding: 0 24px;
+}
+
+.create-account-button:not(:disabled):hover {
+    background: var(--ca-primary-light);
+}
+
+.create-account-button:disabled {
+    color: rgba(255, 255, 255, 0.85);
+    background: rgba(229, 231, 235, 0.9);
+    cursor: not-allowed;
+}
+
+@media (max-width: 760px) {
+    .role-select-header {
+        height: 58px;
+        padding: 0 20px;
+    }
+
+    .role-select-shell {
+        width: 100%;
+        padding: 22px 20px 32px;
+    }
+
+    .progress-row {
+        grid-template-columns: 1fr 1fr auto;
+        gap: 8px;
+        max-width: none;
+        margin-bottom: 22px;
+    }
+
+    .step-label {
+        font-size: 11px;
+    }
+
+    .intro {
+        margin-bottom: 18px;
+    }
+
+    .role-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    .role-card {
+        min-height: 0;
+        flex-direction: row;
+        align-items: center;
+        gap: 14px;
+        padding: 16px;
+    }
+
+    .role-icon {
+        width: 42px;
+        height: 42px;
+        flex: 0 0 auto;
+        font-size: 18px;
+    }
+
+    .role-title {
+        font-size: 16px;
+    }
+
+    .role-description {
+        font-size: 13px;
+    }
+
+    .selected-badge {
+        top: 10px;
+        right: 10px;
+        width: 18px;
+        height: 18px;
+        overflow: hidden;
+        padding: 0;
+        border-radius: 999px;
+        text-indent: 100%;
+        white-space: nowrap;
+    }
+
+    .selected-badge::after {
+        content: "";
+        position: absolute;
+        left: 5px;
+        top: 3px;
+        width: 7px;
+        height: 10px;
+        border: solid #16a34a;
+        border-width: 0 2px 2px 0;
+        transform: rotate(45deg);
+    }
+
+    .actions {
+        flex-direction: column-reverse;
+        align-items: stretch;
+        margin-top: 20px;
+    }
+
+    .back-button {
+        align-self: flex-start;
+        min-height: 36px;
+    }
+
+    .create-account-button {
+        width: 100%;
+    }
+}

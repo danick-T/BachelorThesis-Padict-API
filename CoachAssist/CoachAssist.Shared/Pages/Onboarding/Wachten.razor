@@ -1,0 +1,65 @@
+@page "/onboarding/wachten"
+@layout CoachAssist.Shared.Layout.AuthLayout
+@inject NavigationManager Nav
+@inject Toast Toast
+
+<PageTitle>Aanvraag in afwachting - CoachAssist</PageTitle>
+
+<div class="onboarding-shell">
+    <div class="onboarding-card" style="text-align:center;">
+        <div style="margin: 16px auto 0; width: 96px; height: 96px; border-radius: 50%; background: #FEF3C7; display: flex; align-items: center; justify-content: center; font-size: 36px;">
+            <div style="width: 64px; height: 64px; border-radius: 50%; background: #F4C430; display: flex; align-items: center; justify-content: center;">...</div>
+        </div>
+        <h1 style="font-size: 22px; font-weight: 700; margin-top: 14px;">Even geduld</h1>
+        <div class="text-sm text-muted">Je aanvraag staat in afwachting</div>
+
+        <div class="entity-card mt-16" style="text-align:left;">
+            <div class="entity-logo">?</div>
+            <div style="flex:1;">
+                <div class="fw-600">Gekozen ploeg</div>
+                <div class="text-xs text-muted">De club of coach moet je aanvraag nog behandelen.</div>
+            </div>
+            <span class="badge badge-afwacht">In afwachting</span>
+        </div>
+
+        <div class="card mt-16" style="text-align:left;">
+            <div class="text-xs text-muted fw-600" style="text-transform:uppercase;">Wat gebeurt er nu?</div>
+            <p class="text-sm mt-8" style="color: var(--text-muted);">Je aanvraag is verzonden. Zodra de verantwoordelijke persoon ze goedkeurt, krijg je toegang tot je spelersdashboard.</p>
+
+            <div class="timeline mt-16">
+                <div class="timeline-item">
+                    <div class="timeline-dot"></div>
+                    <div><div class="fw-600 text-sm">Aanvraag verzonden</div><div class="text-xs text-muted">Net ingediend</div></div>
+                </div>
+                <div class="timeline-item">
+                    <div class="timeline-dot pending"></div>
+                    <div><div class="fw-600 text-sm">Wacht op goedkeuring</div><div class="text-xs text-muted">In behandeling</div></div>
+                </div>
+                <div class="timeline-item">
+                    <div class="timeline-dot todo"></div>
+                    <div><div class="fw-600 text-sm text-muted">Toegang tot team</div><div class="text-xs text-muted">Na goedkeuring</div></div>
+                </div>
+            </div>
+        </div>
+
+        <button class="btn-secondary mt-16" style="width:100%;" @onclick="Intrekken">Aanvraag intrekken</button>
+        <a class="text-sm text-muted mt-12" href="/onboarding/team" style="display:inline-block;">Andere ploeg kiezen</a>
+    </div>
+</div>
+
+<style>
+    .onboarding-shell {
+        min-height: 100vh; background: var(--bg);
+        padding: 24px 16px;
+        display: flex; align-items: flex-start; justify-content: center;
+    }
+    .onboarding-card { background: #fff; border-radius: 16px; padding: 24px; max-width: 460px; width: 100%; box-shadow: 0 4px 12px rgba(0,0,0,0.04); }
+</style>
+
+@code {
+    private async Task Intrekken()
+    {
+        await Toast.Show("Aanvraag lokaal gesloten. Kies eventueel een andere ploeg.", "success");
+        Nav.NavigateTo("/onboarding/team");
+    }
+}

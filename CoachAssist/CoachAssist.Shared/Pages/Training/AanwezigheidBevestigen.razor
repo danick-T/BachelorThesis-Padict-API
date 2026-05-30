@@ -1,0 +1,173 @@
+@page "/speler/aanwezigheid"
+@page "/speler/aanwezigheid/{TrainingId:int}"
+@layout CoachAssist.Shared.Layout.SpelerLayout
+@using CoachAssist.Shared.Models.SpelerPages
+@inject NavigationManager Nav
+@inject Toast Toast
+@inject CoachAssistDataContext Data
+
+<PageTitle>Aanwezigheid - CoachAssist</PageTitle>
+
+<div class="app-topbar">
+    <div class="flex gap-8" style="align-items:center;">
+        <button class="icon-btn" @onclick="Terug">&lt;</button>
+        <h1>Aanwezigheid</h1>
+    </div>
+</div>
+
+<div class="app-content" style="max-width: 560px; margin: 0 auto;">
+    @if (Laden)
+    {
+        <div class="card">Training wordt geladen...</div>
+    }
+    else if (!string.IsNullOrWhiteSpace(Fout))
+    {
+        <div class="card" style="border-color:#FCA5A5; background:#FEF2F2;">@Fout</div>
+    }
+    else if (DataItem is null)
+    {
+        <div class="card">Er staat geen training klaar om te bevestigen.</div>
+    }
+    else
+    {
+        <div class="card">
+            <div class="flex gap-12" style="align-items:center;">
+                <div class="avatar" style="background:#DCFCE7; color: var(--accent);">T</div>
+                <div>
+                    <div class="fw-600">Training</div>
+                    <div class="text-sm text-muted">@FormatDatum(DataItem.Training.Datum) - @FormatTijd(DataItem.Training.StartTijd)-@FormatTijd(DataItem.Training.EindTijd)</div>
+                    <div class="text-sm text-muted">@DataItem.Training.TerreinNaam</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-24">
+            <h2 class="fw-600" style="font-size: 18px;">Ben je erbij?</h2>
+            <div class="text-sm text-muted">Laat je coach weten of je aanwezig kan zijn.</div>
+        </div>
+
+        <button class="att-card @(Keuze == "aanwezig" ? "att-aanwezig" : "")" @onclick='() => Keuze = "aanwezig"'>
+            <div class="att-icon att-icon-ok">OK</div>
+            <div style="flex:1; text-align:left;">
+                <div class="fw-600">Ik ben aanwezig</div>
+                <div class="text-xs text-muted">Ik kom naar de training.</div>
+            </div>
+        </button>
+
+        <button class="att-card @(Keuze == "afwezig" ? "att-afwezig" : "")" @onclick='() => Keuze = "afwezig"'>
+            <div class="att-icon att-icon-no">X</div>
+            <div style="flex:1; text-align:left;">
+                <div class="fw-600">Ik ben afwezig</div>
+                <div class="text-xs text-muted">Ik kan deze training niet komen.</div>
+            </div>
+        </button>
+
+        @if (Keuze == "afwezig")
+        {
+            <div class="mt-16">
+                <div class="text-sm fw-600">Reden van afwezigheid (optioneel)</div>
+                <textarea class="input mt-8" rows="3" style="height: auto; padding: 12px 14px; resize: vertical;" placeholder="Bv. vakantie, blessure, school..." @bind="Reden"></textarea>
+            </div>
+        }
+
+        <div class="card mt-16 desktop-only">
+            <div class="flex-between"><div class="fw-600 text-sm">Team-respons tot nu toe</div></div>
+            <div style="display:flex; height:8px; border-radius:999px; overflow:hidden; background:#E5E7EB; margin-top:8px;">
+                <div style="background: var(--success); width: @AanwezigBreedte%;"></div>
+                <div style="background: var(--danger); width: @AfwezigBreedte%;"></div>
+            </div>
+            <div class="flex gap-12 text-xs text-muted mt-8">
+                <span>@DataItem.Aanwezig aanwezig</span><span>@DataItem.Afwezig afwezig</span><span>@DataItem.GeenReactie geen reactie</span>
+            </div>
+        </div>
+
+        <button class="btn-primary mt-24" style="width:100%;" disabled="@(string.IsNullOrEmpty(Keuze) || Bezig)" @onclick="Bevestig">
+            @(Bezig ? "Bezig..." : "Bevestigen")
+        </button>
+    }
+</div>
+
+<style>
+    .att-card {
+        display: flex; align-items: center; gap: 16px;
+        width: 100%; background: #fff; border: 1px solid var(--border);
+        border-radius: 12px; padding: 16px;
+        margin-top: 12px; cursor: pointer; text-align: left;
+        transition: border-color .15s, background .15s;
+    }
+    .att-card.att-aanwezig { border-color: var(--success); background: #F0FDF4; }
+    .att-card.att-afwezig  { border-color: var(--danger); background: #FEF2F2; }
+    .att-icon {
+        width: 40px; height: 40px; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        color: #fff; font-size: 12px; font-weight: 700;
+    }
+    .att-icon-ok { background: var(--success); }
+    .att-icon-no { background: var(--danger); }
+</style>
+
+@code {
+    [Parameter] public int? TrainingId { get; set; }
+
+    private SpelerTrainingAanwezigheidData? DataItem;
+    private string Keuze = "";
+    private string Reden = "";
+    private bool Laden = true;
+    private bool Bezig;
+    private string? Fout;
+
+    private int TotaalReacties => Math.Max(1, (DataItem?.Aanwezig ?? 0) + (DataItem?.Afwezig ?? 0) + (DataItem?.GeenReactie ?? 0));
+    private int AanwezigBreedte => (int)Math.Round((DataItem?.Aanwezig ?? 0) * 100.0 / TotaalReacties);
+    private int AfwezigBreedte => (int)Math.Round((DataItem?.Afwezig ?? 0) * 100.0 / TotaalReacties);
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            DataItem = await Data.GetSpelerAanwezigheidAsync(TrainingId);
+            Keuze = DataItem?.Training.Aanwezig switch
+            {
+                true => "aanwezig",
+                false => "afwezig",
+                _ => ""
+            };
+        }
+        catch (Exception ex)
+        {
+            Fout = $"Aanwezigheid kon niet geladen worden: {ex.Message}";
+        }
+        finally
+        {
+            Laden = false;
+        }
+    }
+
+    private void Terug() => Nav.NavigateTo("/speler/schema");
+
+    private async Task Bevestig()
+    {
+        if (DataItem is null || string.IsNullOrWhiteSpace(Keuze))
+        {
+            return;
+        }
+
+        Bezig = true;
+        try
+        {
+            await Data.BevestigSpelerAanwezigheidAsync(DataItem.Training.TrainingId, Keuze == "aanwezig", Reden);
+            await Toast.Show(Keuze == "aanwezig" ? "Aanwezigheid bevestigd" : "Afwezigheid gemeld", "success");
+            Nav.NavigateTo("/speler");
+        }
+        catch (Exception ex)
+        {
+            Fout = $"Bevestigen is niet gelukt: {ex.Message}";
+        }
+        finally
+        {
+            Bezig = false;
+        }
+    }
+
+    private static string FormatDatum(DateTime datum) => datum.ToString("dd MMM");
+    private static string FormatTijd(TimeSpan tijd) => tijd.ToString(@"hh\:mm");
+}

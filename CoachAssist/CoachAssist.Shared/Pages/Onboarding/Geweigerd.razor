@@ -1,0 +1,37 @@
+@page "/onboarding/geweigerd"
+@layout CoachAssist.Shared.Layout.AuthLayout
+@inject NavigationManager Nav
+
+<PageTitle>Aanvraag geweigerd - CoachAssist</PageTitle>
+
+<div class="onboarding-shell">
+    <div class="onboarding-card" style="text-align:center;">
+        <div style="margin: 16px auto 0; width: 96px; height: 96px; border-radius: 50%; background: #FEE2E2; display: flex; align-items: center; justify-content: center;">
+            <div style="width: 64px; height: 64px; border-radius: 50%; background: var(--danger); display: flex; align-items: center; justify-content: center; color:#fff; font-size: 30px;">x</div>
+        </div>
+        <h1 style="font-size: 22px; font-weight: 700; margin-top: 14px;">Aanvraag geweigerd</h1>
+        <div class="text-sm text-muted">Je bent nog niet toegevoegd aan deze ploeg</div>
+
+        <div class="entity-card mt-16" style="text-align:left;">
+            <div class="entity-logo">?</div>
+            <div style="flex:1;">
+                <div class="fw-600">Gekozen ploeg</div>
+                <div class="text-xs text-muted">De aanvraag werd niet goedgekeurd.</div>
+            </div>
+            <span class="badge badge-geweigerd">Geweigerd</span>
+        </div>
+
+        <div class="card mt-16" style="text-align:left;">
+            <div class="text-xs text-muted fw-600" style="text-transform:uppercase;">Wat kan je doen?</div>
+            <p class="text-sm mt-8" style="color: var(--text-muted);">Kies een andere ploeg of neem contact op met de club als je denkt dat dit niet klopt. Er is geen vaste reden beschikbaar in de huidige aanvraagdata.</p>
+        </div>
+
+        <button class="btn-primary mt-16" style="width:100%;" @onclick='() => Nav.NavigateTo("/onboarding/team")'>Andere ploeg kiezen</button>
+        <a class="text-sm fw-600 mt-12" href="/onboarding/wachten" style="display:inline-block; color: var(--text-muted);">Terug naar aanvraagstatus</a>
+    </div>
+</div>
+
+<style>
+    .onboarding-shell { min-height: 100vh; background: var(--bg); padding: 24px 16px; display:flex; justify-content:center; }
+    .onboarding-card { background: #fff; border-radius: 16px; padding: 24px; max-width: 460px; width: 100%; }
+</style>

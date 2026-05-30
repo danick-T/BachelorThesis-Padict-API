@@ -1,0 +1,120 @@
+@page "/speler/profiel"
+@layout CoachAssist.Shared.Layout.SpelerLayout
+@using CoachAssist.Shared.Models.SpelerPages
+@inject NavigationManager Nav
+@inject CoachAssistDataContext Data
+@inject ICoachAssistApiClient ApiClient
+
+<PageTitle>Mijn profiel - CoachAssist</PageTitle>
+
+<div class="app-topbar">
+    <div>
+        <h1>Mijn profiel</h1>
+    </div>
+    <div class="app-topbar-actions">
+        <a class="btn-secondary" href="/instellingen">Instellingen</a>
+    </div>
+</div>
+
+<div class="app-content" style="max-width: 720px; margin: 0 auto;">
+    @if (Laden)
+    {
+        <div class="card">Profiel wordt geladen...</div>
+    }
+    else if (!string.IsNullOrWhiteSpace(Fout))
+    {
+        <div class="card" style="border-color:#FCA5A5; background:#FEF2F2;">@Fout</div>
+    }
+    else if (Profiel is null)
+    {
+        <div class="card">Er is nog geen spelerprofiel gekoppeld aan dit account.</div>
+    }
+    else
+    {
+        <div class="card" style="background: var(--primary); color: #fff; border: none; text-align:center; padding: 28px;">
+            <div class="avatar avatar-lg" style="background: var(--highlight); color: var(--primary); margin: 0 auto;">@Profiel.Speler.Initialen</div>
+            <div class="fw-600 mt-12" style="font-size: 18px;">@Profiel.Speler.VolledigeNaam</div>
+            <div class="text-sm" style="opacity:.75;">@(Profiel.Speler.Positie ?? "Speler") · #@(Profiel.Speler.Rugnummer?.ToString() ?? "-")</div>
+        </div>
+
+        <div class="card mt-12" style="padding: 0;">
+            <div class="flex" style="padding: 14px;">
+                <div style="flex:1; text-align:center;"><div class="fw-600" style="font-size:22px;">@Profiel.Stats.Goals</div><div class="text-xs text-muted">Goals</div></div>
+                <div style="flex:1; text-align:center; border-left:1px solid var(--border); border-right:1px solid var(--border);"><div class="fw-600" style="font-size:22px;">@Profiel.Stats.Assists</div><div class="text-xs text-muted">Assists</div></div>
+                <div style="flex:1; text-align:center;"><div class="fw-600" style="font-size:22px;">@Profiel.Stats.Wedstrijden</div><div class="text-xs text-muted">Wedstrijden</div></div>
+            </div>
+        </div>
+
+        <div class="text-xs text-muted mt-16" style="text-transform:uppercase; font-weight:600;">Persoonlijk</div>
+        <div class="card mt-8" style="padding:0;">
+            @foreach (var f in Persoonlijk)
+            {
+                <div class="flex-between" style="padding: 14px; border-bottom: 1px solid var(--border);">
+                    <span class="text-muted text-sm">@f.Label</span>
+                    <div class="flex gap-8" style="align-items:center;"><span class="fw-600 text-sm">@f.Waarde</span></div>
+                </div>
+            }
+        </div>
+
+        <div class="text-xs text-muted mt-16" style="text-transform:uppercase; font-weight:600;">Speler</div>
+        <div class="card mt-8" style="padding:0;">
+            @foreach (var f in SpelerVelden)
+            {
+                <div class="flex-between" style="padding: 14px; border-bottom: 1px solid var(--border);">
+                    <span class="text-muted text-sm">@f.Label</span><span class="fw-600 text-sm">@f.Waarde</span>
+                </div>
+            }
+        </div>
+
+        <button class="btn-secondary mt-16" style="width:100%;" @onclick="Uitloggen">Uitloggen</button>
+    }
+</div>
+
+@code {
+    private sealed record Veld(string Label, string Waarde);
+
+    private SpelerProfielData? Profiel;
+    private bool Laden = true;
+    private string? Fout;
+
+    private IEnumerable<Veld> Persoonlijk => Profiel is null
+        ? Array.Empty<Veld>()
+        : new[]
+        {
+            new Veld("Voornaam", Profiel.Speler.Voornaam),
+            new Veld("Achternaam", Profiel.Speler.Achternaam),
+            new Veld("E-mail", Profiel.Speler.Email ?? "-")
+        };
+
+    private IEnumerable<Veld> SpelerVelden => Profiel is null
+        ? Array.Empty<Veld>()
+        : new[]
+        {
+            new Veld("Club", Profiel.Speler.ClubNaam ?? "-"),
+            new Veld("Team", Profiel.Speler.TeamNaam),
+            new Veld("Positie", Profiel.Speler.Positie ?? "-"),
+            new Veld("Rugnummer", Profiel.Speler.Rugnummer?.ToString() ?? "-")
+        };
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            Profiel = await Data.GetSpelerProfielAsync();
+        }
+        catch (Exception ex)
+        {
+            Fout = $"Profiel kon niet geladen worden: {ex.Message}";
+        }
+        finally
+        {
+            Laden = false;
+        }
+    }
+
+    private void Uitloggen()
+    {
+        ApiClient.Logout();
+        Nav.NavigateTo("/login");
+    }
+}

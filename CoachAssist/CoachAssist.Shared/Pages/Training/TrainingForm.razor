@@ -1,0 +1,178 @@
+@page "/coach/training/nieuw"
+@layout CoachAssist.Shared.Layout.CoachLayout
+@using CoachAssist.Core.DTOs.Terrein
+@using CoachAssist.Core.DTOs.Training
+@inject NavigationManager Nav
+@inject Toast Toast
+@inject CoachAssistDataContext DataContext
+@inject ICoachAssistApiClient Api
+
+<PageTitle>Nieuwe training - CoachAssist</PageTitle>
+
+<div class="app-topbar">
+    <div class="flex gap-8" style="align-items:center;">
+        <button class="icon-btn" @onclick='() => Nav.NavigateTo("/coach/kalender")'>x</button>
+        <h1>Nieuwe training</h1>
+    </div>
+    <div class="app-topbar-actions">
+        <button class="btn-secondary" disabled="@IsSaving" @onclick="Opslaan">Opslaan</button>
+    </div>
+</div>
+
+<div class="app-content" style="max-width: 640px; margin: 0 auto;">
+    @if (IsLoading)
+    {
+        <div class="card text-sm text-muted">Formulier wordt geladen...</div>
+    }
+    else if (!string.IsNullOrWhiteSpace(ErrorMessage))
+    {
+        <div class="card text-sm" style="background:#FEF2F2; border-color:#FECACA; color:#991B1B;">@ErrorMessage</div>
+    }
+
+    <div class="field">
+        <label class="field-label">Sjabloon</label>
+        <div class="chips" style="margin-top: 8px;">
+            @foreach (var s in Sjablonen)
+            {
+                <button class="chip @(Sjabloon == s ? "active" : "")" @onclick="() => Sjabloon = s">@s</button>
+            }
+        </div>
+    </div>
+
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        <div class="field"><label class="field-label">Datum</label><input class="input" type="date" @bind="Datum" /></div>
+        <div class="field"><label class="field-label">Tijd</label><input class="input" type="time" @bind="Tijd" /></div>
+    </div>
+
+    <div class="field">
+        <label class="field-label">Duur</label>
+        <select class="input" @bind="Duur">
+            <option value="60">60 minuten</option>
+            <option value="75">75 minuten</option>
+            <option value="90">90 minuten</option>
+            <option value="120">120 minuten</option>
+        </select>
+    </div>
+
+    <div class="field">
+        <label class="field-label">Terrein</label>
+        <select class="input" @bind="TerreinId" disabled="@(!Terreinen.Any())">
+            @foreach (var terrein in Terreinen)
+            {
+                <option value="@terrein.TerreinId">@terrein.Naam · @terrein.Adres</option>
+            }
+        </select>
+    </div>
+
+    <div class="field">
+        <label class="field-label">Thema</label>
+        <div class="chips" style="margin-top: 8px;">
+            @foreach (var t in Themas)
+            {
+                <button class="chip @(Themas2.Contains(t) ? "active" : "")" @onclick="() => ToggleThema(t)">@t</button>
+            }
+        </div>
+    </div>
+
+    <div class="card mt-16" style="display:flex; align-items:center; gap:12px;">
+        <div class="avatar" style="background:#DCFCE7; color: var(--accent);">T</div>
+        <div style="flex:1;">
+            <div class="fw-600 text-sm">Aanwezigheid uitnodigen</div>
+            <div class="text-xs text-muted">@AantalSpelers spelers ontvangen melding</div>
+        </div>
+    </div>
+
+    <div class="field"><label class="field-label">Notities (optioneel)</label>
+        <textarea class="input" rows="3" style="height:auto; padding:12px 14px;" placeholder="Bv. neem regenkledij mee" @bind="Notities"></textarea>
+    </div>
+
+    <button class="btn-primary mt-16" style="width:100%;" disabled="@(IsSaving || TeamId is null || TerreinId is null)" @onclick="Opslaan">Training aanmaken</button>
+</div>
+
+@code {
+    private string Sjabloon = "Wekelijks · di";
+    private DateTime Datum = DateTime.Today.AddDays(1);
+    private TimeOnly Tijd = new(19, 0);
+    private int Duur = 90;
+    private int? TeamId;
+    private int? TerreinId;
+    private int AantalSpelers;
+    private bool IsLoading = true;
+    private bool IsSaving;
+    private string? ErrorMessage;
+    private List<string> Themas2 = new() { "Afwerking" };
+    private string Notities = "";
+    private readonly string[] Sjablonen = ["Wekelijks · di", "Wekelijks · do", "Eenmalig"];
+    private readonly string[] Themas = ["Afwerking", "Verdediging", "Conditie", "Combinatie", "Stilstaand"];
+    private readonly List<TerreinResponse> Terreinen = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var team = await DataContext.GetTeamVoorCoachAsync();
+            if (team is null)
+            {
+                ErrorMessage = "Er kon geen team gevonden worden voor deze coach.";
+                return;
+            }
+
+            TeamId = team.TeamId;
+            AantalSpelers = team.Spelers.Count;
+            Terreinen.AddRange(await DataContext.GetTerreinenVoorClubAsync(team.ClubId));
+            TerreinId = Terreinen.FirstOrDefault()?.TerreinId;
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private void ToggleThema(string t)
+    {
+        if (Themas2.Contains(t)) Themas2.Remove(t); else Themas2.Add(t);
+    }
+
+    private async Task Opslaan()
+    {
+        if (TeamId is null || TerreinId is null) return;
+
+        IsSaving = true;
+        ErrorMessage = null;
+
+        try
+        {
+            var request = new MaakTrainingRequest
+            {
+                TeamId = TeamId.Value,
+                TerreinId = TerreinId.Value,
+                Datum = Datum,
+                StartTijd = Tijd.ToTimeSpan(),
+                EindTijd = Tijd.ToTimeSpan().Add(TimeSpan.FromMinutes(Duur)),
+                Opmerking = string.Join(", ", Themas2.Concat(string.IsNullOrWhiteSpace(Notities) ? [] : [Notities]))
+            };
+
+            using var response = await Api.PostAsJsonAuthorizedAsync("api/trainingen", request);
+            if (!response.IsSuccessStatusCode)
+            {
+                ErrorMessage = "Training kon niet aangemaakt worden.";
+                return;
+            }
+
+            await Toast.Show("Training aangemaakt", "success");
+            Nav.NavigateTo("/coach/kalender");
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            IsSaving = false;
+        }
+    }
+}

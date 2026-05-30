@@ -1,0 +1,138 @@
+@page "/speler/stats"
+@layout CoachAssist.Shared.Layout.SpelerLayout
+@using CoachAssist.Shared.Models.SpelerPages
+@inject CoachAssistDataContext Data
+
+<PageTitle>Mijn stats - CoachAssist</PageTitle>
+
+<div class="app-topbar">
+    <div>
+        <h1>Mijn statistieken</h1>
+        <div class="app-topbar-sub">@Subtitel</div>
+    </div>
+    <div class="app-topbar-actions">
+        <button class="btn-secondary" disabled>Exporteer PDF</button>
+    </div>
+</div>
+
+<div class="app-content">
+    @if (Laden)
+    {
+        <div class="card">Statistieken worden geladen...</div>
+    }
+    else if (!string.IsNullOrWhiteSpace(Fout))
+    {
+        <div class="card" style="border-color:#FCA5A5; background:#FEF2F2;">@Fout</div>
+    }
+    else if (Stats is null)
+    {
+        <div class="card">Er zijn nog geen spelerstatistieken beschikbaar.</div>
+    }
+    else
+    {
+        <div class="stats-row mt-12" style="grid-template-columns: repeat(5, 1fr);">
+            <div class="stat-tile"><div class="stat-tile-value">@Stats.Totaal.Goals</div><div class="stat-tile-label">Goals</div></div>
+            <div class="stat-tile"><div class="stat-tile-value">@Stats.Totaal.Assists</div><div class="stat-tile-label">Assists</div></div>
+            <div class="stat-tile"><div class="stat-tile-value">@Stats.Totaal.Wedstrijden</div><div class="stat-tile-label">Gespeeld</div></div>
+            <div class="stat-tile"><div class="stat-tile-value">@Stats.Totaal.Minuten</div><div class="stat-tile-label">Minuten</div></div>
+            <div class="stat-tile"><div class="stat-tile-value">@Stats.Totaal.GeleKaarten</div><div class="stat-tile-label">Geel</div></div>
+        </div>
+
+        <div class="row-2col mt-24">
+            <div class="card">
+                <div class="flex-between"><div class="fw-600">Goals en assists per maand</div><div class="text-xs text-muted">Op basis van ingevoerde stats</div></div>
+                @if (Stats.Maanden.Count == 0)
+                {
+                    <div class="text-sm text-muted mt-16">Nog geen maanddata beschikbaar.</div>
+                }
+                else
+                {
+                    <div class="flex gap-8 mt-16" style="align-items:flex-end; height: 180px; justify-content: space-around;">
+                        @{ var maxV = Math.Max(1, Stats.Maanden.Max(m => Math.Max(m.Goals, m.Assists))); }
+                        @foreach (var m in Stats.Maanden)
+                        {
+                            <div style="display:flex; flex-direction:column; align-items:center; gap:4px; flex:1;">
+                                <div style="display:flex; gap:2px; align-items:flex-end; height: 140px;">
+                                    <div style="width: 12px; background: var(--highlight); height: @((int)(m.Goals * 100.0 / maxV))%; border-radius:4px 4px 0 0;"></div>
+                                    <div style="width: 12px; background: var(--accent); height: @((int)(m.Assists * 100.0 / maxV))%; border-radius:4px 4px 0 0;"></div>
+                                </div>
+                                <span class="text-xs text-muted">@m.Naam</span>
+                            </div>
+                        }
+                    </div>
+                    <div class="flex gap-12 mt-8 text-xs"><span>Goals</span><span>Assists</span></div>
+                }
+            </div>
+            <div class="card">
+                <div class="fw-600">Onderscheidingen</div>
+                @if (Stats.Onderscheidingen.Count == 0)
+                {
+                    <div class="text-sm text-muted mt-16">Nog geen onderscheidingen beschikbaar.</div>
+                }
+                else
+                {
+                    @foreach (var o in Stats.Onderscheidingen)
+                    {
+                        <div class="flex gap-12" style="padding: 10px 0; border-bottom: 1px solid var(--border); align-items:center;">
+                            <div style="font-size: 22px;">@o.Icon</div>
+                            <div>
+                                <div class="fw-600 text-sm">@o.Naam</div>
+                                <div class="text-xs text-muted">@o.Subtitel</div>
+                            </div>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+
+        <div class="card mt-24" style="padding: 0;">
+            <div class="flex desktop-only" style="padding: 12px 16px; font-size: 11px; color: var(--text-muted); text-transform: uppercase; border-bottom: 1px solid var(--border);">
+                <div style="flex:1;">Datum</div><div style="flex:2;">Tegenstander</div><div style="flex:1;">Uitslag</div>
+                <div style="width:50px;">Min</div><div style="width:30px;">G</div><div style="width:30px;">A</div><div style="width:30px;">Geel</div>
+            </div>
+            @if (Stats.Wedstrijden.Count == 0)
+            {
+                <div style="padding: 16px;" class="text-sm text-muted">Nog geen wedstrijden beschikbaar.</div>
+            }
+            else
+            {
+                @foreach (var w in Stats.Wedstrijden)
+                {
+                    <div class="flex" style="padding: 12px 16px; border-bottom: 1px solid var(--border); align-items:center;">
+                        <div style="flex:1;" class="text-sm text-muted">@w.Datum.ToString("dd MMM")</div>
+                        <div style="flex:2;" class="text-sm fw-600">@w.Tegenstander</div>
+                        <div style="flex:1;"><span class="badge @w.BadgeClass">@w.Uitslag</span></div>
+                        <div style="width:50px;" class="text-sm">@w.Minuten</div>
+                        <div style="width:30px;" class="text-sm fw-600">@w.Goals</div>
+                        <div style="width:30px;" class="text-sm fw-600">@w.Assists</div>
+                        <div style="width:30px;" class="text-sm">@w.GeleKaarten</div>
+                    </div>
+                }
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private SpelerStatsData? Stats;
+    private bool Laden = true;
+    private string? Fout;
+
+    private string Subtitel => Stats is null ? "Echte seizoendata" : $"{Stats.Speler.TeamNaam} · {Stats.Speler.VolledigeNaam}";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            Stats = await Data.GetSpelerStatsAsync();
+        }
+        catch (Exception ex)
+        {
+            Fout = $"Statistieken konden niet geladen worden: {ex.Message}";
+        }
+        finally
+        {
+            Laden = false;
+        }
+    }
+}

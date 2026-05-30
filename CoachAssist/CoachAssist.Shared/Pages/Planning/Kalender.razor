@@ -1,0 +1,220 @@
+@page "/coach/kalender"
+@layout CoachAssist.Shared.Layout.CoachLayout
+@using System.Globalization
+@using CoachAssist.Core.DTOs.Training
+@using CoachAssist.Core.DTOs.Wedstrijd
+@inject CoachAssistDataContext DataContext
+
+<PageTitle>Kalender - CoachAssist</PageTitle>
+
+<div class="app-topbar">
+    <div>
+        <h1>Kalender</h1>
+        <div class="app-topbar-sub">@(TeamNaam ?? MaandLabel)</div>
+    </div>
+    <div class="app-topbar-actions desktop-only">
+        <button class="icon-btn" @onclick="VorigeMaand">&lt;</button>
+        <button class="btn-secondary" style="height:38px;" @onclick="GaNaarVandaag">@MaandLabel</button>
+        <button class="icon-btn" @onclick="VolgendeMaand">&gt;</button>
+        <div class="tabs" style="margin: 0 8px;">
+            <button class="@(View == "Maand" ? "active" : "")" @onclick='() => View = "Maand"'>Maand</button>
+            <button class="@(View == "Lijst" ? "active" : "")" @onclick='() => View = "Lijst"'>Lijst</button>
+        </div>
+        <a class="btn-primary" href="/coach/wedstrijd/nieuw">+ Nieuwe activiteit</a>
+    </div>
+</div>
+
+<div class="app-content">
+    @if (IsLoading)
+    {
+        <div class="card text-sm text-muted">Kalender wordt geladen...</div>
+    }
+    else if (!string.IsNullOrWhiteSpace(ErrorMessage))
+    {
+        <div class="card text-sm" style="background:#FEF2F2; border-color:#FECACA; color:#991B1B;">@ErrorMessage</div>
+    }
+    else
+    {
+        @if (View == "Maand")
+        {
+            <div class="card">
+                <div class="cal-head">
+                    <span>M</span><span>D</span><span>W</span><span>D</span><span>V</span><span>Z</span><span>Z</span>
+                </div>
+                <div class="cal-grid">
+                    @foreach (var d in Dagen)
+                    {
+                        <div class="cal-cell @(d.Today ? "today" : "") @(d.Other ? "other" : "")">
+                            <span>@d.Nr</span>
+                            @if (d.Dot != null)
+                            {
+                                <span class="cal-dot" style="background:@d.Dot;"></span>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        <h2 class="section-label mt-24">Aankomende activiteiten</h2>
+        <div style="display:flex; flex-direction:column; gap:10px;">
+            @if (Activiteiten.Count == 0)
+            {
+                <div class="card text-sm text-muted">Er zijn nog geen trainingen of wedstrijden ingepland.</div>
+            }
+            else
+            {
+                @foreach (var a in Activiteiten)
+                {
+                    <a class="card flex" href="@a.Url" style="align-items:center; gap:12px; text-decoration:none; color:inherit;">
+                        <div class="avatar" style="background:@a.IconBg; color:@a.IconColor;">@a.Icon</div>
+                        <div style="flex:1;">
+                            <div class="text-xs text-muted">@a.DatumLabel</div>
+                            <div class="fw-600">@a.Titel</div>
+                            <div class="text-xs text-muted">@a.Sub</div>
+                        </div>
+                        <span class="badge badge-gepland">@a.Status</span>
+                    </a>
+                }
+            }
+        </div>
+    }
+
+    <a class="btn-fab mobile-only" href="/coach/wedstrijd/nieuw">+</a>
+</div>
+
+<style>
+    .cal-head, .cal-grid {
+        display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
+    }
+    .cal-head span { text-align:center; font-size: 12px; color: var(--text-muted); padding: 8px 0; }
+    .cal-cell {
+        aspect-ratio: 1;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        font-size: 14px; border-radius: 8px;
+        position: relative;
+    }
+    .cal-cell.other { color: #D1D5DB; }
+    .cal-cell.today { background: var(--primary); color: #fff; font-weight: 700; }
+    .cal-dot { width: 6px; height: 6px; border-radius: 50%; position:absolute; bottom: 6px; }
+</style>
+
+@code {
+    record Dag(DateTime Datum, string Nr, bool Today, bool Other, string? Dot);
+    record Activiteit(DateTime Datum, TimeSpan Start, string DatumLabel, string Titel, string Sub, string Icon, string IconBg, string IconColor, string Status, string Url);
+
+    private static readonly CultureInfo NlBe = new("nl-BE");
+
+    private string View = "Maand";
+    private DateTime _vandaag;
+    private DateTime _zichtbareMaand;
+    private string? TeamNaam;
+    private bool IsLoading = true;
+    private string? ErrorMessage;
+    private List<Dag> Dagen = new();
+    private List<Activiteit> Activiteiten = new();
+
+    private string MaandLabel => _zichtbareMaand.ToString("MMMM yyyy", NlBe);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _vandaag = DateTime.Today;
+        _zichtbareMaand = new DateTime(_vandaag.Year, _vandaag.Month, 1);
+
+        try
+        {
+            var team = await DataContext.GetTeamVoorCoachAsync();
+            if (team is null)
+            {
+                ErrorMessage = "Er kon geen team gevonden worden voor deze coach.";
+                return;
+            }
+
+            TeamNaam = $"{team.Naam} - {MaandLabel}";
+            var trainingen = await DataContext.GetTrainingenVoorTeamAsync(team.TeamId);
+            var wedstrijden = await DataContext.GetWedstrijdenVoorTeamAsync(team.TeamId);
+
+            Activiteiten = trainingen.Select(MapTraining)
+                .Concat(wedstrijden.Select(w => MapWedstrijd(w, team.Naam)))
+                .Where(a => a.Datum.Date >= _vandaag.Date)
+                .OrderBy(a => a.Datum)
+                .ThenBy(a => a.Start)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Kalender kon niet geladen worden: {ex.Message}";
+        }
+        finally
+        {
+            HerberekenDagen();
+            IsLoading = false;
+        }
+    }
+
+    private void VorigeMaand()
+    {
+        _zichtbareMaand = _zichtbareMaand.AddMonths(-1);
+        TeamNaam = TeamNaam is null ? null : $"{TeamNaam.Split(" - ")[0]} - {MaandLabel}";
+        HerberekenDagen();
+    }
+
+    private void VolgendeMaand()
+    {
+        _zichtbareMaand = _zichtbareMaand.AddMonths(1);
+        TeamNaam = TeamNaam is null ? null : $"{TeamNaam.Split(" - ")[0]} - {MaandLabel}";
+        HerberekenDagen();
+    }
+
+    private void GaNaarVandaag()
+    {
+        _zichtbareMaand = new DateTime(_vandaag.Year, _vandaag.Month, 1);
+        TeamNaam = TeamNaam is null ? null : $"{TeamNaam.Split(" - ")[0]} - {MaandLabel}";
+        HerberekenDagen();
+    }
+
+    private void HerberekenDagen()
+    {
+        int offset = ((int)_zichtbareMaand.DayOfWeek + 6) % 7;
+        var start = _zichtbareMaand.AddDays(-offset);
+
+        var lijst = new List<Dag>(42);
+        for (int i = 0; i < 42; i++)
+        {
+            var datum = start.AddDays(i);
+            bool isVandaag = datum.Date == _vandaag.Date;
+            bool isAndereMaand = datum.Month != _zichtbareMaand.Month;
+            var heeftTraining = Activiteiten.Any(a => a.Datum.Date == datum.Date && a.Icon == "T");
+            var heeftWedstrijd = Activiteiten.Any(a => a.Datum.Date == datum.Date && a.Icon == "W");
+            var dot = heeftWedstrijd ? "#3B82F6" : heeftTraining ? "var(--accent)" : null;
+            lijst.Add(new Dag(datum, datum.Day.ToString(), isVandaag, isAndereMaand, dot));
+        }
+        Dagen = lijst;
+    }
+
+    private static Activiteit MapTraining(TrainingResponse training) => new(
+        training.Datum,
+        training.StartTijd,
+        $"{training.Datum.ToString("ddd dd MMM", NlBe)} - {training.StartTijd.ToString(@"hh\:mm")}",
+        "Training",
+        string.IsNullOrWhiteSpace(training.TerreinNaam) ? "Terrein nog niet ingevuld" : training.TerreinNaam,
+        "T",
+        "#DCFCE7",
+        "var(--accent)",
+        training.Status.ToString(),
+        $"/coach/training/{training.TrainingId}");
+
+    private static Activiteit MapWedstrijd(WedstrijdResponse wedstrijd, string teamNaam) => new(
+        wedstrijd.Datum,
+        wedstrijd.StartTijd,
+        $"{wedstrijd.Datum.ToString("ddd dd MMM", NlBe)} - {wedstrijd.StartTijd.ToString(@"hh\:mm")}",
+        $"{teamNaam} vs {wedstrijd.Tegenstander}",
+        wedstrijd.ThuisScore.HasValue && wedstrijd.UitScore.HasValue
+            ? $"{wedstrijd.ThuisScore}-{wedstrijd.UitScore}"
+            : "Wedstrijd",
+        "W",
+        "#EFF6FF",
+        "#3B82F6",
+        wedstrijd.Status.ToString(),
+        $"/coach/wedstrijd/{wedstrijd.WedstrijdId}");
+}

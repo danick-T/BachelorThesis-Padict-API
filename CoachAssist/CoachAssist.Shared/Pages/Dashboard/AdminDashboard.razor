@@ -1,0 +1,153 @@
+@page "/admin"
+@layout CoachAssist.Shared.Layout.AdminLayout
+@using CoachAssist.Core.DTOs.Aanvraag
+@using CoachAssist.Core.DTOs.Club
+@using CoachAssist.Core.DTOs.Team
+@inject CoachAssistDataContext DataContext
+
+<PageTitle>Admin dashboard - CoachAssist</PageTitle>
+
+<div class="app-topbar">
+    <div>
+        <h1 class="desktop-only">Dashboard</h1>
+        <h1 class="mobile-only">Dashboard</h1>
+        <div class="app-topbar-sub">@(Club?.Naam ?? "Club") · Beheer overzicht</div>
+    </div>
+    <div class="app-topbar-actions">
+        <button class="icon-btn">🔔<span class="dot"></span></button>
+        <button class="btn-primary desktop-only">+ Team toevoegen</button>
+    </div>
+</div>
+
+<div class="app-content">
+    @if (IsLoading)
+    {
+        <div class="card text-sm text-muted">Dashboard wordt geladen...</div>
+    }
+    else if (!string.IsNullOrWhiteSpace(ErrorMessage))
+    {
+        <div class="card text-sm" style="background:#FEF2F2; border-color:#FECACA; color:#991B1B;">@ErrorMessage</div>
+    }
+    else
+    {
+        <div class="stats-row">
+            <div class="stat-tile">
+                <div class="stat-tile-icon" style="background:#EEF2FF; color:#4338CA; width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;">👥</div>
+                <div class="stat-tile-value mt-8">@Teams.Sum(t => t.Spelers.Count)</div>
+                <div class="stat-tile-label">Totaal spelers</div>
+            </div>
+            <div class="stat-tile">
+                <div class="stat-tile-icon" style="background:#FEF3C7; color:#D97706; width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;">🔔</div>
+                <div class="stat-tile-value mt-8">@Aanvragen.Count</div>
+                <div class="stat-tile-label">Open aanvragen</div>
+            </div>
+            <div class="stat-tile">
+                <div class="stat-tile-icon" style="background:#DCFCE7; color:#16A34A; width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;">✓</div>
+                <div class="stat-tile-value mt-8">@Teams.Count</div>
+                <div class="stat-tile-label">Actieve teams</div>
+            </div>
+            <div class="stat-tile">
+                <div class="stat-tile-icon" style="background:#EFF6FF; color:#3B82F6; width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;">📍</div>
+                <div class="stat-tile-value mt-8">@AantalTerreinen</div>
+                <div class="stat-tile-label">Terreinen</div>
+            </div>
+        </div>
+
+        <div class="row-2col mt-24">
+            <div>
+                <div class="flex-between">
+                    <h2 class="section-label" style="margin:0;">Openstaande aanvragen</h2>
+                    <a href="/admin/aanvragen" class="text-sm fw-600 text-muted">Alles bekijken →</a>
+                </div>
+                <div class="card mt-8" style="padding: 0; overflow:hidden;">
+                    <div class="flex desktop-only" style="padding: 12px 16px; font-size: 11px; color: var(--text-muted); text-transform:uppercase; border-bottom: 1px solid var(--border);">
+                        <div style="flex:2;">Naam</div>
+                        <div style="flex:2;">E-mail</div>
+                        <div style="flex:1;">Datum</div>
+                    </div>
+                    @foreach (var a in Aanvragen.Take(5))
+                    {
+                        <div class="flex" style="padding: 12px 16px; border-bottom: 1px solid var(--border); align-items: center;">
+                            <div style="flex:2;" class="flex gap-12" >
+                                <div class="avatar avatar-sm">@Initialen(a.GebruikerNaam)</div>
+                                <div>
+                                    <div class="text-sm fw-600">@a.GebruikerNaam</div>
+                                    <div class="text-xs text-muted mobile-only">wil lid worden · @Datum(a.DatumAanvraag)</div>
+                                </div>
+                            </div>
+                            <div style="flex:2;" class="text-sm text-muted desktop-only">@a.Email</div>
+                            <div style="flex:1;" class="text-sm text-muted desktop-only">@Datum(a.DatumAanvraag)</div>
+                        </div>
+                    }
+                    @if (!Aanvragen.Any())
+                    {
+                        <div class="text-sm text-muted" style="padding: 20px;">Geen open clubaanvragen.</div>
+                    }
+                </div>
+            </div>
+
+            <div>
+                <h2 class="section-label">Teams in club</h2>
+                <div style="display:flex; flex-direction:column; gap:8px;">
+                    @foreach (var t in Teams.Take(6))
+                    {
+                        <div class="card flex" style="align-items:center; gap: 12px; padding: 12px;">
+                            <div class="avatar avatar-sm" style="background: var(--primary); color: var(--highlight); border-radius:8px; font-weight:700;">@Kort(t.Naam)</div>
+                            <div style="flex:1;">
+                                <div class="fw-600 text-sm">@t.Naam</div>
+                                <div class="text-xs text-muted">Coach: @(t.CoachNaam ?? "Geen coach")</div>
+                            </div>
+                            <span class="badge" style="background:#F3F4F6; color: var(--text); font-weight:700;">@t.Spelers.Count</span>
+                            <span class="text-muted">›</span>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private ClubResponse? Club;
+    private bool IsLoading = true;
+    private string? ErrorMessage;
+    private int AantalTerreinen;
+    private readonly List<ClubAanvraagResponse> Aanvragen = new();
+    private readonly List<TeamDetailResponse> Teams = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            Club = await DataContext.GetEersteClubAsync();
+            if (Club is null)
+            {
+                ErrorMessage = "Er kon geen club gevonden worden.";
+                return;
+            }
+
+            Teams.AddRange(await DataContext.GetTeamsVoorClubAsync(Club.ClubId));
+            Aanvragen.AddRange(await DataContext.GetOpenClubAanvragenAsync(Club.ClubId));
+            AantalTerreinen = (await DataContext.GetTerreinenVoorClubAsync(Club.ClubId)).Count;
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private static string Initialen(string naam)
+    {
+        var delen = naam.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return string.Concat(delen.Take(2).Select(d => d[0])).ToUpperInvariant();
+    }
+
+    private static string Kort(string naam) =>
+        naam.Length <= 5 ? naam : string.Concat(naam.Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(w => w[0])).ToUpperInvariant();
+
+    private static string Datum(DateTime? datum) => datum?.ToString("dd/MM/yyyy") ?? "";
+}

@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+    <link rel="stylesheet" href="_content/CoachAssist.Shared/bootstrap/bootstrap.min.css" />
+    <link rel="stylesheet" href="_content/CoachAssist.Shared/app.css" />
+    <link rel="stylesheet" href="CoachAssist.Web.styles.css" />
+    <link rel="icon" type="image/png" href="_content/CoachAssist.Shared/favicon.png" />
+    <HeadOutlet @rendermode="InteractiveServerNoPrerender" />
+</head>
+
+<body>
+    <Routes @rendermode="InteractiveServerNoPrerender" />
+    <script src="_framework/blazor.web.js"></script>
+</body>
+
+</html>
+
+@code {
+    private static readonly InteractiveServerRenderMode InteractiveServerNoPrerender = new(prerender: false);
+}

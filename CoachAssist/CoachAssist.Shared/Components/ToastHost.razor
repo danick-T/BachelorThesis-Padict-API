@@ -1,0 +1,12 @@
+@inject Toast Toast
+@implements IDisposable
+
+@if (Toast.Visible)
+{
+    <div class="toast toast-@Toast.Kind">@Toast.Message</div>
+}
+
+@code {
+    protected override void OnInitialized() => Toast.OnChange += StateHasChanged;
+    public void Dispose() => Toast.OnChange -= StateHasChanged;
+}

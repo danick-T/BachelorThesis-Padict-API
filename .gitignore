@@ -1,0 +1,29 @@
+# Build output
+**/bin/
+**/obj/
+**/.backend-build/
+**/.build-output/
+**/.codex-build/
+**/_build_web_check/
+**/_test-output/
+
+# IDE and local state
+.vs/
+.claude/
+.docker-config/
+*.user
+*.suo
+
+# Local agent/project notes that are not needed for deployment
+AGENTS.md
+CLAUDE.md
+Mockup/
+
+# Local secrets
+*.secrets.json
+.env
+.env.*
+
+# OS files
+Thumbs.db
+Desktop.ini

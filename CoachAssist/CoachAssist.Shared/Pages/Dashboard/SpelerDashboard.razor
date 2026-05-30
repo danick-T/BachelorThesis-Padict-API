@@ -1,0 +1,224 @@
+@page "/speler"
+@layout CoachAssist.Shared.Layout.SpelerLayout
+@using CoachAssist.Shared.Models.SpelerPages
+@inject CoachAssistDataContext Data
+
+<PageTitle>Speler dashboard - CoachAssist</PageTitle>
+
+<div class="app-topbar">
+    <div>
+        <h1>@(Dashboard is null ? "Speler dashboard" : $"Hey, {Dashboard.Speler.Voornaam}")</h1>
+        <div class="app-topbar-sub">@Subtitel</div>
+    </div>
+    <div class="app-topbar-actions">
+        <button class="icon-btn">!</button>
+    </div>
+</div>
+
+<div class="app-content">
+    @if (Laden)
+    {
+        <div class="card">Spelerdata wordt geladen...</div>
+    }
+    else if (!string.IsNullOrWhiteSpace(Fout))
+    {
+        <div class="card" style="border-color:#FCA5A5; background:#FEF2F2;">@Fout</div>
+    }
+    else if (Dashboard is null)
+    {
+        <div class="card">Er is nog geen spelerprofiel gekoppeld aan dit account.</div>
+    }
+    else
+    {
+        <div class="card desktop-only" style="background: var(--primary); color:#fff; border:none; position:relative; overflow:hidden;">
+            <div class="flex gap-16" style="align-items:center;">
+                <div class="avatar avatar-lg" style="background: var(--primary-light);">@Dashboard.Speler.Initialen<span class="avatar-num">@Rugnummer</span></div>
+                <div>
+                    <div class="text-xs" style="opacity:.7; text-transform:uppercase;">Mijn seizoen</div>
+                    <div class="fw-600" style="font-size:24px;">@Dashboard.Speler.VolledigeNaam</div>
+                    <div class="text-sm" style="opacity:.8;">@SpelerInfo</div>
+                </div>
+            </div>
+            <div class="stats-row mt-16" style="grid-template-columns: repeat(5, 1fr);">
+                <div class="stat-tile" style="background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.08); color:#fff;"><div class="stat-tile-value" style="color:#fff;">@Dashboard.Stats.Goals</div><div class="text-xs" style="opacity:.7;">Goals</div></div>
+                <div class="stat-tile" style="background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.08); color:#fff;"><div class="stat-tile-value" style="color:#fff;">@Dashboard.Stats.Assists</div><div class="text-xs" style="opacity:.7;">Assists</div></div>
+                <div class="stat-tile" style="background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.08); color:#fff;"><div class="stat-tile-value" style="color:#fff;">@Dashboard.Stats.Minuten</div><div class="text-xs" style="opacity:.7;">Minuten</div></div>
+                <div class="stat-tile" style="background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.08); color:#fff;"><div class="stat-tile-value" style="color:#fff;">@Dashboard.Stats.GeleKaarten</div><div class="text-xs" style="opacity:.7;">Geel</div></div>
+                <div class="stat-tile" style="background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.08); color:#fff;"><div class="stat-tile-value" style="color:#fff;">@Dashboard.Stats.RodeKaarten</div><div class="text-xs" style="opacity:.7;">Rood</div></div>
+            </div>
+        </div>
+
+        <div class="mobile-only" style="background: var(--primary); color:#fff; border-radius:12px; padding: 16px; margin-top: 8px;">
+            <div class="stats-row" style="grid-template-columns: repeat(4, 1fr);">
+                <div style="background: rgba(255,255,255,0.06); padding: 10px; border-radius:8px; text-align:center;"><div class="fw-600" style="font-size:18px;">@Dashboard.Stats.Goals</div><div class="text-xs" style="opacity:.7;">goals</div></div>
+                <div style="background: rgba(255,255,255,0.06); padding: 10px; border-radius:8px; text-align:center;"><div class="fw-600" style="font-size:18px;">@Dashboard.Stats.Assists</div><div class="text-xs" style="opacity:.7;">assists</div></div>
+                <div style="background: rgba(255,255,255,0.06); padding: 10px; border-radius:8px; text-align:center;"><div class="fw-600" style="font-size:18px;">@Dashboard.Stats.Minuten</div><div class="text-xs" style="opacity:.7;">min</div></div>
+                <div style="background: rgba(255,255,255,0.06); padding: 10px; border-radius:8px; text-align:center;"><div class="fw-600" style="font-size:18px;">@Dashboard.Stats.GeleKaarten</div><div class="text-xs" style="opacity:.7;">geel</div></div>
+            </div>
+        </div>
+
+        <div class="row-2col mt-16">
+            <div>
+                <h2 class="section-label">Bevestig je aanwezigheid</h2>
+                @if (Dashboard.VolgendeTraining is null)
+                {
+                    <div class="card">Er staat geen komende training klaar.</div>
+                }
+                else
+                {
+                    var training = Dashboard.VolgendeTraining;
+                    <div class="card">
+                        <div class="flex-between">
+                            <div class="flex gap-12" style="align-items:center;">
+                                <div class="avatar" style="background:#DCFCE7; color: var(--accent);">T</div>
+                                <div>
+                                    <div class="fw-600">Training - @FormatDatum(training.Datum)</div>
+                                    <div class="text-sm text-muted">@FormatTijd(training.StartTijd)-@FormatTijd(training.EindTijd) - @training.TerreinNaam</div>
+                                </div>
+                            </div>
+                            <span class="badge @BadgeVoorAanwezigheid(training.Aanwezig)">@LabelVoorAanwezigheid(training.Aanwezig)</span>
+                        </div>
+                        <div class="flex gap-8 mt-16">
+                            <a class="btn-primary" href="@($"/speler/aanwezigheid/{training.TrainingId}")" style="flex:1;">Aanwezigheid invullen</a>
+                        </div>
+                    </div>
+                }
+
+                <h2 class="section-label mt-24">Volgende wedstrijd</h2>
+                @if (Dashboard.VolgendeWedstrijd is null)
+                {
+                    <div class="card">Er staat geen komende wedstrijd gepland.</div>
+                }
+                else
+                {
+                    var wedstrijd = Dashboard.VolgendeWedstrijd;
+                    <div class="card">
+                        <div class="flex-between">
+                            <span class="badge badge-gepland">@wedstrijd.Status</span>
+                            <span class="text-sm text-muted">@FormatDatum(wedstrijd.Datum) - @FormatTijd(wedstrijd.StartTijd)</span>
+                        </div>
+                        <div class="flex-between mt-12">
+                            <div>
+                                <div class="text-xs text-muted">TEAM</div>
+                                <div class="fw-600" style="font-size:18px;">@wedstrijd.TeamNaam</div>
+                            </div>
+                            <div class="text-muted">VS</div>
+                            <div style="text-align:right;">
+                                <div class="text-xs text-muted">TEGEN</div>
+                                <div class="fw-600" style="font-size:18px;">@wedstrijd.Tegenstander</div>
+                            </div>
+                        </div>
+                        <div class="text-sm text-muted mt-12">@wedstrijd.TerreinNaam</div>
+                    </div>
+                }
+            </div>
+
+            <div>
+                <h2 class="section-label">Laatste wedstrijden</h2>
+                @if (Dashboard.LaatsteWedstrijden.Count == 0)
+                {
+                    <div class="card">Er zijn nog geen gespeelde wedstrijden met statistieken.</div>
+                }
+                else
+                {
+                    <div class="card" style="padding: 0;">
+                        @foreach (var w in Dashboard.LaatsteWedstrijden)
+                        {
+                            <div class="flex-between" style="padding: 12px 16px; border-bottom: 1px solid var(--border);">
+                                <div class="flex gap-12" style="align-items:center;">
+                                    <span class="badge @BadgeVoorWedstrijd(w)" style="width:28px; height:28px; padding:0; border-radius:50%; justify-content:center;">@LetterVoorWedstrijd(w)</span>
+                                    <div>
+                                        <div class="fw-600">vs @w.Tegenstander</div>
+                                        <div class="text-xs text-muted">G @w.Goals A @w.Assists - @FormatDatum(w.Datum)</div>
+                                    </div>
+                                </div>
+                                <div class="fw-600">@Score(w)</div>
+                            </div>
+                        }
+                    </div>
+                }
+
+                <h2 class="section-label mt-24">Aanwezigheid trainingen</h2>
+                <div class="card">
+                    <div class="flex-between text-sm"><span class="text-muted">Dit seizoen</span><span class="fw-600">@Dashboard.AanwezigTrainingen / @Dashboard.TotaalTrainingen (@AanwezigheidsPercentage%)</span></div>
+                    <div style="background:#E5E7EB; border-radius: 999px; height: 8px; margin-top: 8px; overflow:hidden;">
+                        <div style="background: var(--accent); width: @AanwezigheidsPercentage%; height: 100%;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private SpelerDashboardData? Dashboard;
+    private bool Laden = true;
+    private string? Fout;
+
+    private string Subtitel => Dashboard is null
+        ? "Echte spelerdata"
+        : $"{Dashboard.Speler.TeamNaam} · {Dashboard.Speler.ClubNaam}";
+
+    private string Rugnummer => Dashboard?.Speler.Rugnummer?.ToString() ?? "-";
+
+    private string SpelerInfo => Dashboard is null
+        ? string.Empty
+        : $"{Dashboard.Speler.Positie ?? "Speler"} · #{Rugnummer} · {Dashboard.Speler.TeamNaam}";
+
+    private int AanwezigheidsPercentage => Dashboard is null || Dashboard.TotaalTrainingen == 0
+        ? 0
+        : (int)Math.Round(Dashboard.AanwezigTrainingen * 100.0 / Dashboard.TotaalTrainingen);
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            Dashboard = await Data.GetSpelerDashboardAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine("[SpelerDashboard] " + ex);
+            Fout = $"Spelerdata kon niet geladen worden: {ex.GetType().Name}: {ex.Message}";
+        }
+        finally
+        {
+            Laden = false;
+        }
+    }
+
+    private static string FormatDatum(DateTime datum) => datum.ToString("dd MMM");
+    private static string FormatTijd(TimeSpan tijd) => tijd.ToString(@"hh\:mm");
+
+    private static string LabelVoorAanwezigheid(bool? aanwezig) => aanwezig switch
+    {
+        true => "Bevestigd",
+        false => "Afwezig",
+        _ => "Bevestig"
+    };
+
+    private static string BadgeVoorAanwezigheid(bool? aanwezig) => aanwezig switch
+    {
+        true => "badge-actief",
+        false => "badge-geweigerd",
+        _ => "badge-afwacht"
+    };
+
+    private static string Score(SpelerWedstrijdCard w) =>
+        w.ThuisScore is null || w.UitScore is null ? "-" : $"{w.ThuisScore}-{w.UitScore}";
+
+    private static string LetterVoorWedstrijd(SpelerWedstrijdCard w)
+    {
+        if (w.ThuisScore is null || w.UitScore is null) return "?";
+        if (w.ThuisScore > w.UitScore) return "W";
+        if (w.ThuisScore == w.UitScore) return "G";
+        return "V";
+    }
+
+    private static string BadgeVoorWedstrijd(SpelerWedstrijdCard w) => LetterVoorWedstrijd(w) switch
+    {
+        "W" => "badge-gespeeld",
+        "G" => "badge-afwacht",
+        "V" => "badge-geweigerd",
+        _ => "badge-gepland"
+    };
+}

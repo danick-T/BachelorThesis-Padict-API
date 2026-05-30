@@ -1,0 +1,154 @@
+@page "/speler/wedstrijd/{Id:int?}"
+@layout CoachAssist.Shared.Layout.SpelerLayout
+@using CoachAssist.Shared.Models.SpelerPages
+@inject CoachAssistDataContext Data
+
+<PageTitle>Wedstrijddetail - CoachAssist</PageTitle>
+
+<div class="app-topbar">
+    <div>
+        <div class="text-xs text-muted">Schema - Wedstrijden</div>
+        <h1>@Titel</h1>
+        <div class="app-topbar-sub">@Subtitel</div>
+    </div>
+    <div class="app-topbar-actions">
+        @if (Detail is not null)
+        {
+            <span class="badge badge-gespeeld">@Detail.Wedstrijd.Status</span>
+        }
+    </div>
+</div>
+
+<div class="app-content">
+    @if (Laden)
+    {
+        <div class="card">Wedstrijd wordt geladen...</div>
+    }
+    else if (!string.IsNullOrWhiteSpace(Fout))
+    {
+        <div class="card" style="border-color:#FCA5A5; background:#FEF2F2;">@Fout</div>
+    }
+    else if (Detail is null)
+    {
+        <div class="card">Deze wedstrijd kon niet gevonden worden.</div>
+    }
+    else
+    {
+        <div class="row-2col">
+            <div>
+                <div class="card" style="background: linear-gradient(135deg, var(--primary), var(--primary-light)); color: #fff; border: none;">
+                    <div class="flex gap-12" style="align-items:center;">
+                        <div class="avatar avatar-lg" style="background: var(--highlight); color: var(--primary);">@Detail.Speler.Initialen<span class="avatar-num">@Rugnummer</span></div>
+                        <div style="flex:1;">
+                            <div class="text-xs" style="opacity:.7;">JOUW WEDSTRIJD</div>
+                            <div class="fw-600" style="font-size: 18px;">@Detail.Speler.VolledigeNaam</div>
+                            <div class="text-sm" style="opacity:.85;">@Detail.Wedstrijd.Goals goals, @Detail.Wedstrijd.Assists assists.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stats-row mt-16" style="grid-template-columns: repeat(4, 1fr);">
+                    <div class="stat-tile"><div class="stat-tile-value">@Detail.Wedstrijd.Goals</div><div class="stat-tile-label">Goals</div></div>
+                    <div class="stat-tile"><div class="stat-tile-value">@Detail.Wedstrijd.Assists</div><div class="stat-tile-label">Assists</div></div>
+                    <div class="stat-tile"><div class="stat-tile-value">@Detail.SpelerStats.Minuten</div><div class="stat-tile-label">Seizoen min.</div></div>
+                    <div class="stat-tile"><div class="stat-tile-value">@Score(Detail.Wedstrijd)</div><div class="stat-tile-label">Uitslag</div></div>
+                </div>
+
+                <div class="card mt-16">
+                    <div class="fw-600">Wedstrijdverloop</div>
+                    <div class="mt-12" style="display: flex; flex-direction: column; gap: 10px;">
+                        @foreach (var e in Detail.Events)
+                        {
+                            <div class="flex gap-12" style="align-items:center; padding: 8px; border-radius:8px; background: @(e.IsEigenSpeler ? "#FEF9C3" : "transparent");">
+                                <div class="text-sm text-muted" style="width:36px;">@(e.Minuut == 0 ? "-" : $"{e.Minuut}'")</div>
+                                <div class="event-bullet @e.CssClass">@e.Icon</div>
+                                <div class="text-sm fw-600" style="flex:1;">@e.Tekst</div>
+                                @if (e.IsEigenSpeler)
+                                {
+                                    <span class="badge badge-afwacht">Jij</span>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <div class="card">
+                    <div class="fw-600">Teamstatistieken</div>
+                    @if (Detail.TeamStats.Count == 0)
+                    {
+                        <div class="text-sm text-muted mt-12">Er zijn nog geen teamstatistieken geregistreerd.</div>
+                    }
+                    else
+                    {
+                        @foreach (var t in Detail.TeamStats)
+                        {
+                            <div class="mt-12">
+                                <div class="flex-between text-sm"><span class="fw-600">@t.Links</span><span class="text-muted">@t.Naam</span><span class="fw-600">@t.Rechts</span></div>
+                                <div style="display:flex; height: 6px; border-radius:999px; overflow:hidden; background: #FEE2E2;">
+                                    <div style="background: var(--success); width: @StatBreedte(t)%;"></div>
+                                </div>
+                            </div>
+                        }
+                    }
+                </div>
+
+                <div class="card mt-16">
+                    <div class="fw-600">Wedstrijdinfo</div>
+                    <div class="flex-between text-sm mt-12"><span class="text-muted">Datum</span><span class="fw-600">@FormatDatum(Detail.Wedstrijd.Datum) - @FormatTijd(Detail.Wedstrijd.StartTijd)</span></div>
+                    <div class="flex-between text-sm"><span class="text-muted">Locatie</span><span class="fw-600">@Detail.Wedstrijd.TerreinNaam</span></div>
+                    <div class="flex-between text-sm"><span class="text-muted">Team</span><span class="fw-600">@Detail.Wedstrijd.TeamNaam</span></div>
+                    <div class="flex-between text-sm"><span class="text-muted">Tegenstander</span><span class="fw-600">@Detail.Wedstrijd.Tegenstander</span></div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .event-bullet {
+        width: 28px; height: 28px; border-radius: 50%;
+        display:flex; align-items:center; justify-content:center;
+        background: var(--highlight); color: #1A1A1A; font-size: 12px;
+    }
+</style>
+
+@code {
+    [Parameter] public int? Id { get; set; }
+
+    private SpelerWedstrijdDetailData? Detail;
+    private bool Laden = true;
+    private string? Fout;
+
+    private string Titel => Detail is null
+        ? "Wedstrijd"
+        : $"{Detail.Wedstrijd.TeamNaam} - {Detail.Wedstrijd.Tegenstander}";
+
+    private string Subtitel => Detail is null
+        ? "Echte wedstrijddata"
+        : $"{FormatDatum(Detail.Wedstrijd.Datum)} - {FormatTijd(Detail.Wedstrijd.StartTijd)}";
+
+    private string Rugnummer => Detail?.Speler.Rugnummer?.ToString() ?? "-";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            Detail = await Data.GetSpelerWedstrijdDetailAsync(Id);
+        }
+        catch (Exception ex)
+        {
+            Fout = $"Wedstrijd kon niet geladen worden: {ex.Message}";
+        }
+        finally
+        {
+            Laden = false;
+        }
+    }
+
+    private static string FormatDatum(DateTime datum) => datum.ToString("dd MMM yyyy");
+    private static string FormatTijd(TimeSpan tijd) => tijd.ToString(@"hh\:mm");
+    private static string Score(SpelerWedstrijdCard w) => w.ThuisScore is null || w.UitScore is null ? "-" : $"{w.ThuisScore}-{w.UitScore}";
+    private static int StatBreedte(SpelerTeamStat stat) => stat.Links + stat.Rechts == 0 ? 0 : (int)Math.Round(stat.Links * 100.0 / (stat.Links + stat.Rechts));
+}

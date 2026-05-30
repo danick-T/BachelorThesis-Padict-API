@@ -1,0 +1,439 @@
+@page "/coach/opstelling"
+@page "/coach/opstelling/{Id:int}"
+@layout CoachAssist.Shared.Layout.CoachLayout
+@using CoachAssist.Core.DTOs.Opstelling
+@using CoachAssist.Core.DTOs.Speler
+@using CoachAssist.Core.DTOs.Wedstrijd
+@using CoachAssist.Core.Enums
+@inject CoachAssistDataContext DataContext
+@inject Toast Toast
+
+<PageTitle>Opstelling opmaken - CoachAssist</PageTitle>
+
+<div class="app-topbar">
+    <div>
+        <div class="text-xs text-muted">Kalender - @WedstrijdLabel</div>
+        <h1>Opstelling opmaken</h1>
+        <div class="app-topbar-sub">@Subtitel</div>
+    </div>
+    <div class="app-topbar-actions">
+        <button class="btn-secondary" @onclick="Reset" disabled="@IsLoading">Reset</button>
+        <button class="btn-primary" @onclick="Opslaan" disabled="@(IsLoading || IsSaving || Wedstrijd is null)">@(IsSaving ? "Opslaan..." : "Opstelling opslaan")</button>
+    </div>
+</div>
+
+<div class="app-content">
+    @if (IsLoading)
+    {
+        <div class="card text-sm text-muted">Opstelling wordt geladen...</div>
+    }
+    else if (!string.IsNullOrWhiteSpace(ErrorMessage))
+    {
+        <div class="card text-sm" style="background:#FEF2F2; border-color:#FECACA; color:#991B1B;">@ErrorMessage</div>
+    }
+    else
+    {
+        <div style="display:grid; grid-template-columns: 280px 1fr 280px; gap: 24px;" class="lineup-grid">
+            <div>
+                <div class="card">
+                    <div class="text-xs text-muted fw-600" style="text-transform:uppercase; letter-spacing:.5px;">Formatie</div>
+                    <div class="flex gap-8 mt-12" style="flex-wrap:wrap;">
+                        @foreach (var f in Formaties)
+                        {
+                            <button @onclick="() => KiesFormatie(f, true)" class="chip @(Formatie == f ? "active" : "")">@f</button>
+                        }
+                    </div>
+                </div>
+
+                <div class="card mt-16">
+                    <div class="flex-between">
+                        <div class="fw-600">Bank - @Bank.Count(p => !p.OpVeld) spelers</div>
+                        <div class="text-xs text-muted">Klik op een speler</div>
+                    </div>
+                    <div class="mt-12" style="display:flex; flex-direction:column; gap:8px; max-height: 500px; overflow-y:auto;">
+                        @foreach (var s in Bank.Where(p => !p.OpVeld))
+                        {
+                            <button class="flex gap-8 player-pick @(GekozenSpeler == s ? "picked" : "")" style="align-items:center; padding:8px; border:1px solid var(--border); border-radius:8px; background:#fff; text-align:left; cursor:pointer;" @onclick="() => SelecteerSpeler(s)">
+                                <div class="avatar avatar-sm">@s.Init<span class="avatar-num">@s.Nr</span></div>
+                                <div style="flex:1;">
+                                    <div class="text-sm fw-600">@s.Naam</div>
+                                    <div class="text-xs text-muted">@s.Pos</div>
+                                </div>
+                                @if (GekozenSpeler == s)
+                                {
+                                    <span class="text-xs fw-600" style="color: var(--accent);">Kies positie</span>
+                                }
+                            </button>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <div class="football-field">
+                    @foreach (var p in Posities)
+                    {
+                        var bezet = Bank.FirstOrDefault(b => b.OpVeld && b.X == p.X && b.Y == p.Y);
+                        <div class="field-pos" style="left: @(p.X)%; top: @(p.Y)%;" @onclick="() => KiesPositie(p)">
+                            @if (bezet != null)
+                            {
+                                <div class="field-circle filled">@bezet.Nr</div>
+                                <div class="field-name">@bezet.Naam</div>
+                                <button class="field-remove" @onclick:stopPropagation="true" @onclick="() => Verwijder(bezet)">x</button>
+                            }
+                            else
+                            {
+                                <div class="field-circle empty">+</div>
+                                <div class="field-name placeholder">@p.Label</div>
+                            }
+                        </div>
+                    }
+                </div>
+                <div class="text-xs text-muted mt-8" style="text-align:center;">
+                    @if (GekozenSpeler != null)
+                    {
+                        <span>Klik op een positie om <b>@GekozenSpeler.Naam</b> te plaatsen.</span>
+                    }
+                    else
+                    {
+                        <span>Klik op een speler links en kies daarna een positie op het veld.</span>
+                    }
+                </div>
+            </div>
+
+            <div>
+                <div class="card">
+                    <div class="text-xs text-muted fw-600" style="text-transform:uppercase;">Wedstrijd</div>
+                    <div class="fw-600 mt-8" style="font-size:18px;">@WedstrijdLabel</div>
+                    <div class="text-sm text-muted">@Wedstrijd?.Datum.ToString("dd/MM/yyyy") - @Wedstrijd?.StartTijd.ToString(@"hh\:mm")</div>
+                    <div class="text-sm text-muted">@Wedstrijd?.TerreinNaam</div>
+                </div>
+                <div class="card mt-16">
+                    <div class="text-xs text-muted fw-600" style="text-transform:uppercase;">Samenstelling</div>
+                    <div class="flex-between text-sm mt-12"><span>Doelmannen</span><span class="fw-600">@(Aantal("Keeper"))/1</span></div>
+                    <div class="flex-between text-sm"><span>Verdedigers</span><span class="fw-600">@(Aantal("Verd"))/@(LimitFor("Verd"))</span></div>
+                    <div class="flex-between text-sm"><span>Middenvelders</span><span class="fw-600">@(Aantal("Mid"))/@(LimitFor("Mid"))</span></div>
+                    <div class="flex-between text-sm"><span>Aanvallers</span><span class="fw-600">@(Aantal("Aanv"))/@(LimitFor("Aanv"))</span></div>
+                </div>
+                <div class="card mt-16">
+                    <div class="text-xs text-muted fw-600" style="text-transform:uppercase;">Status</div>
+                    <div class="fw-600 mt-8">@(BestaandeOpstellingId is null ? "Nieuwe opstelling" : "Bestaande opstelling")</div>
+                    <div class="text-sm text-muted">@Bank.Count(s => s.OpVeld) spelers op het veld</div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .lineup-grid { grid-template-columns: 280px 1fr 280px; }
+    @@media (max-width: 1100px) { .lineup-grid { grid-template-columns: 1fr; } }
+
+    .football-field {
+        position: relative;
+        background: linear-gradient(180deg, #3a7d56 0%, #2c6242 100%);
+        background-image: repeating-linear-gradient(180deg, rgba(255,255,255,0.06) 0 40px, transparent 40px 80px), linear-gradient(180deg, #3a7d56 0%, #2c6242 100%);
+        border-radius: 12px;
+        aspect-ratio: 2 / 3;
+        max-height: 720px;
+        margin: 0 auto;
+        max-width: 560px;
+        border: 4px solid rgba(255,255,255,0.4);
+        overflow: hidden;
+    }
+    .football-field::before { content: ""; position: absolute; top: 50%; left: 10%; right: 10%; border-top: 2px solid rgba(255,255,255,0.4); }
+    .football-field::after { content: ""; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 80px; height: 80px; border: 2px solid rgba(255,255,255,0.4); border-radius: 50%; }
+    .field-pos { position: absolute; transform: translate(-50%, -50%); text-align: center; cursor: pointer; }
+    .field-circle {
+        width: 38px; height: 38px; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        margin: 0 auto; font-weight: 700; font-size: 14px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    }
+    .field-circle.filled { background: #fff; color: #1A1A1A; }
+    .field-circle.empty { background: rgba(255,255,255,0.2); color: rgba(255,255,255,0.7); border: 2px dashed rgba(255,255,255,0.4); }
+    .field-name {
+        margin-top: 4px; background: rgba(0,0,0,0.55); color:#fff; font-size: 10px;
+        padding: 2px 6px; border-radius: 4px; white-space: nowrap;
+    }
+    .field-name.placeholder { background: rgba(0,0,0,0.3); color: rgba(255,255,255,0.7); }
+    .field-remove {
+        position: absolute; top: -4px; right: -8px;
+        width: 18px; height: 18px; border-radius: 50%;
+        background: var(--danger); color: #fff; border: none; font-size: 11px;
+        display: flex; align-items:center; justify-content:center; cursor:pointer;
+    }
+    .player-pick.picked { border-color: var(--accent); background: #F0FDF4; }
+</style>
+
+@code {
+    [Parameter] public int? Id { get; set; }
+
+    private sealed class Speler
+    {
+        public int SpelerId { get; set; }
+        public int Nr { get; set; }
+        public string Init { get; set; } = "";
+        public string Naam { get; set; } = "";
+        public string Pos { get; set; } = "";
+        public bool OpVeld { get; set; }
+        public double X { get; set; }
+        public double Y { get; set; }
+        public OpstellingPositie PositieNaam { get; set; }
+    }
+
+    private record Positie(double X, double Y, string Label, OpstellingPositie PositieNaam);
+
+    private bool IsLoading = true;
+    private bool IsSaving;
+    private string? ErrorMessage;
+    private string Formatie = "4-3-3";
+    private readonly string[] Formaties = new[] { "4-3-3", "4-4-2", "3-5-2" };
+    private Speler? GekozenSpeler;
+    private WedstrijdDetailResponse? Wedstrijd;
+    private int? BestaandeOpstellingId;
+    private List<Speler> Bank = new();
+    private List<Positie> Posities = new();
+
+    private string WedstrijdLabel => Wedstrijd is null ? "Wedstrijd" : $"{Wedstrijd.TeamNaam} vs {Wedstrijd.Tegenstander}";
+    private string Subtitel => Wedstrijd is null ? "Kies een wedstrijd" : $"{Wedstrijd.TeamNaam} vs {Wedstrijd.Tegenstander}";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var team = await DataContext.GetTeamVoorCoachAsync();
+            if (team is null)
+            {
+                ErrorMessage = "Er kon geen team gevonden worden voor deze coach.";
+                return;
+            }
+
+            var wedstrijdId = Id ?? (await DataContext.GetWedstrijdenVoorTeamAsync(team.TeamId))
+                .OrderBy(w => w.Datum)
+                .ThenBy(w => w.StartTijd)
+                .Select(w => (int?)w.WedstrijdId)
+                .FirstOrDefault();
+
+            if (wedstrijdId is null)
+            {
+                ErrorMessage = "Er is nog geen wedstrijd waarvoor een opstelling kan worden gemaakt.";
+                return;
+            }
+
+            Wedstrijd = await DataContext.GetWedstrijdDetailAsync(wedstrijdId.Value);
+            if (Wedstrijd is null)
+            {
+                ErrorMessage = "Wedstrijd kon niet geladen worden.";
+                return;
+            }
+
+            var spelers = await DataContext.GetSpelersVoorTeamAsync(Wedstrijd.TeamId);
+            Bank = spelers
+                .OrderBy(s => s.Rugnummer ?? int.MaxValue)
+                .ThenBy(s => s.Achternaam)
+                .Select(MapSpeler)
+                .ToList();
+
+            var bestaande = await DataContext.GetOpstellingVoorWedstrijdAsync(Wedstrijd.WedstrijdId);
+            Formatie = string.IsNullOrWhiteSpace(bestaande?.Formatie) ? "4-3-3" : bestaande!.Formatie;
+            KiesFormatie(Formatie, false);
+
+            if (bestaande is not null)
+            {
+                BestaandeOpstellingId = bestaande.OpstellingId;
+                PlaatsBestaandeOpstelling(bestaande);
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private void KiesFormatie(string f, bool wisVeld)
+    {
+        Formatie = f;
+        if (wisVeld)
+        {
+            foreach (var s in Bank)
+            {
+                s.OpVeld = false;
+                s.X = 0;
+                s.Y = 0;
+            }
+        }
+
+        Posities = f switch
+        {
+            "4-4-2" => new()
+            {
+                new(50, 90, "Keeper", OpstellingPositie.Keeper),
+                new(16, 70, "Verd", OpstellingPositie.Linksback), new(38, 72, "Verd", OpstellingPositie.CentraleVerdediger), new(62, 72, "Verd", OpstellingPositie.CentraleVerdediger), new(84, 70, "Verd", OpstellingPositie.Rechtsback),
+                new(16, 50, "Mid", OpstellingPositie.Linksbuiten), new(38, 50, "Mid", OpstellingPositie.CentraleMiddenvelder), new(62, 50, "Mid", OpstellingPositie.CentraleMiddenvelder), new(84, 50, "Mid", OpstellingPositie.Rechtsbuiten),
+                new(36, 22, "Aanv", OpstellingPositie.Spits), new(64, 22, "Aanv", OpstellingPositie.Spits),
+            },
+            "3-5-2" => new()
+            {
+                new(50, 90, "Keeper", OpstellingPositie.Keeper),
+                new(28, 72, "Verd", OpstellingPositie.CentraleVerdediger), new(50, 75, "Verd", OpstellingPositie.CentraleVerdediger), new(72, 72, "Verd", OpstellingPositie.CentraleVerdediger),
+                new(14, 52, "Mid", OpstellingPositie.Linksbuiten), new(34, 50, "Mid", OpstellingPositie.CentraleMiddenvelder), new(50, 48, "Mid", OpstellingPositie.VerdedigendeMiddenvelder), new(66, 50, "Mid", OpstellingPositie.CentraleMiddenvelder), new(86, 52, "Mid", OpstellingPositie.Rechtsbuiten),
+                new(36, 22, "Aanv", OpstellingPositie.Spits), new(64, 22, "Aanv", OpstellingPositie.Spits),
+            },
+            _ => new()
+            {
+                new(50, 90, "Keeper", OpstellingPositie.Keeper),
+                new(16, 70, "Verd", OpstellingPositie.Linksback), new(38, 72, "Verd", OpstellingPositie.CentraleVerdediger), new(62, 72, "Verd", OpstellingPositie.CentraleVerdediger), new(84, 70, "Verd", OpstellingPositie.Rechtsback),
+                new(30, 50, "Mid", OpstellingPositie.CentraleMiddenvelder), new(50, 50, "Mid", OpstellingPositie.VerdedigendeMiddenvelder), new(70, 50, "Mid", OpstellingPositie.CentraleMiddenvelder),
+                new(22, 26, "Aanv", OpstellingPositie.Linksbuiten), new(50, 18, "Aanv", OpstellingPositie.Spits), new(78, 26, "Aanv", OpstellingPositie.Rechtsbuiten),
+            }
+        };
+
+        GekozenSpeler = null;
+    }
+
+    private void PlaatsBestaandeOpstelling(OpstellingResponse bestaande)
+    {
+        foreach (var item in bestaande.Spelers)
+        {
+            var speler = Bank.FirstOrDefault(s => s.SpelerId == item.SpelerId);
+            if (speler is null)
+            {
+                continue;
+            }
+
+            speler.OpVeld = true;
+            speler.X = item.VeldPositieX ?? 50;
+            speler.Y = item.VeldPositieY ?? 50;
+            speler.PositieNaam = item.PositieNaam;
+        }
+    }
+
+    private void SelecteerSpeler(Speler s) => GekozenSpeler = GekozenSpeler == s ? null : s;
+
+    private void KiesPositie(Positie p)
+    {
+        if (Bank.Any(b => b.OpVeld && b.X == p.X && b.Y == p.Y) || GekozenSpeler is null)
+        {
+            return;
+        }
+
+        GekozenSpeler.OpVeld = true;
+        GekozenSpeler.X = p.X;
+        GekozenSpeler.Y = p.Y;
+        GekozenSpeler.PositieNaam = p.PositieNaam;
+        GekozenSpeler = null;
+    }
+
+    private void Verwijder(Speler s)
+    {
+        s.OpVeld = false;
+        s.X = 0;
+        s.Y = 0;
+    }
+
+    private void Reset()
+    {
+        foreach (var s in Bank)
+        {
+            s.OpVeld = false;
+            s.X = 0;
+            s.Y = 0;
+        }
+        GekozenSpeler = null;
+    }
+
+    private async Task Opslaan()
+    {
+        if (Wedstrijd is null)
+        {
+            return;
+        }
+
+        var spelersOpVeld = Bank.Where(s => s.OpVeld).ToList();
+        if (spelersOpVeld.Count < 11)
+        {
+            await Toast.Show($"Nog {11 - spelersOpVeld.Count} spelers nodig op het veld", "error");
+            return;
+        }
+
+        IsSaving = true;
+        try
+        {
+            var request = new MaakOpstellingRequest
+            {
+                WedstrijdId = Wedstrijd.WedstrijdId,
+                Formatie = Formatie,
+                Spelers = spelersOpVeld.Select(s => new OpstellingSpelerDto
+                {
+                    SpelerId = s.SpelerId,
+                    PositieNaam = s.PositieNaam,
+                    VeldPositieX = (int)Math.Round(s.X),
+                    VeldPositieY = (int)Math.Round(s.Y)
+                }).ToList()
+            };
+
+            var opgeslagen = await DataContext.BewaarOpstellingAsync(BestaandeOpstellingId, request);
+            BestaandeOpstellingId = opgeslagen?.OpstellingId ?? BestaandeOpstellingId;
+            await Toast.Show("Opstelling opgeslagen", "success");
+        }
+        catch (Exception ex)
+        {
+            await Toast.Show(ex.Message, "error", 3500);
+        }
+        finally
+        {
+            IsSaving = false;
+        }
+    }
+
+    private int Aantal(string rol)
+    {
+        return Bank.Count(s => s.OpVeld && Posities.Any(p => p.X == s.X && p.Y == s.Y && p.Label == rol));
+    }
+
+    private int LimitFor(string rol) => Posities.Count(p => p.Label == rol);
+
+    private static Speler MapSpeler(SpelerResponse speler)
+    {
+        var naam = $"{speler.Voornaam} {speler.Achternaam}".Trim();
+        return new Speler
+        {
+            SpelerId = speler.SpelerId,
+            Nr = speler.Rugnummer ?? speler.SpelerId,
+            Init = Initialen(speler.Voornaam, speler.Achternaam),
+            Naam = naam,
+            Pos = PositieNaam(speler.VastePositie),
+            PositieNaam = MapOpstellingPositie(speler.VastePositie)
+        };
+    }
+
+    private static string Initialen(string voornaam, string achternaam)
+    {
+        var eerste = string.IsNullOrWhiteSpace(voornaam) ? "" : voornaam[..1];
+        var tweede = string.IsNullOrWhiteSpace(achternaam) ? "" : achternaam[..1];
+        return $"{eerste}{tweede}".ToUpperInvariant();
+    }
+
+    private static string PositieNaam(VastePositie? positie) => positie switch
+    {
+        VastePositie.Keeper => "Keeper",
+        VastePositie.Verdediger => "Verdediger",
+        VastePositie.Middenvelder => "Middenvelder",
+        VastePositie.Aanvaller => "Aanvaller",
+        _ => "Niet gespecificeerd"
+    };
+
+    private static OpstellingPositie MapOpstellingPositie(VastePositie? positie) => positie switch
+    {
+        VastePositie.Keeper => OpstellingPositie.Keeper,
+        VastePositie.Verdediger => OpstellingPositie.CentraleVerdediger,
+        VastePositie.Middenvelder => OpstellingPositie.CentraleMiddenvelder,
+        VastePositie.Aanvaller => OpstellingPositie.Spits,
+        _ => OpstellingPositie.CentraleMiddenvelder
+    };
+}

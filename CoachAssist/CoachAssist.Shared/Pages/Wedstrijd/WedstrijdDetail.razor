@@ -1,0 +1,252 @@
+@page "/coach/wedstrijd/{Id:int?}"
+@layout CoachAssist.Shared.Layout.CoachLayout
+@using CoachAssist.Core.DTOs.Opstelling
+@using CoachAssist.Core.DTOs.Statistiek
+@using CoachAssist.Core.DTOs.Wedstrijd
+@inject CoachAssistDataContext DataContext
+@inject Toast Toast
+
+<PageTitle>Wedstrijddetail - CoachAssist</PageTitle>
+
+@if (IsLoading)
+{
+    <div class="app-content">
+        <div class="card text-sm text-muted">Wedstrijd wordt geladen...</div>
+    </div>
+}
+else if (!string.IsNullOrWhiteSpace(ErrorMessage))
+{
+    <div class="app-content">
+        <div class="card text-sm" style="background:#FEF2F2; border-color:#FECACA; color:#991B1B;">@ErrorMessage</div>
+    </div>
+}
+else if (Wedstrijd is not null)
+{
+    <div class="app-topbar">
+        <div>
+            <div class="text-xs text-muted">Kalender - Wedstrijden - @Wedstrijd.Datum.ToString("dd/MM/yyyy")</div>
+            <h1>@TeamNaam - @Wedstrijd.Tegenstander</h1>
+            <div class="app-topbar-sub">@Wedstrijd.TerreinNaam - @Wedstrijd.StartTijd.ToString(@"hh\:mm")</div>
+        </div>
+        <div class="app-topbar-actions">
+            <span class="badge badge-gespeeld">@Wedstrijd.Status</span>
+            <a class="btn-secondary" href="/coach/stats-invoeren/@Wedstrijd.WedstrijdId">Stats bewerken</a>
+            <button class="btn-primary" @onclick="RapportDelen">Rapport delen</button>
+        </div>
+    </div>
+
+    <div class="app-content">
+        <div class="row-2col">
+            <div>
+                <div class="match-head">
+                    <div class="side">
+                        <div class="entity-logo" style="margin: 0 auto 6px;">@Kort(TeamNaam)</div>
+                        <div class="name">@TeamNaam</div>
+                        <div class="sub">Thuis</div>
+                    </div>
+                    <div style="text-align:center;">
+                        <div class="score">@Score</div>
+                        <div style="font-size: 12px; opacity:.7;">@Wedstrijd.Status</div>
+                    </div>
+                    <div class="side">
+                        <div class="entity-logo" style="margin: 0 auto 6px;">@Kort(Wedstrijd.Tegenstander)</div>
+                        <div class="name">@Wedstrijd.Tegenstander</div>
+                        <div class="sub">Uit</div>
+                    </div>
+                </div>
+
+                <div class="tabs mt-16">
+                    @foreach (var t in TabNames)
+                    {
+                        <button class="@(Actief == t ? "active" : "")" @onclick="() => Actief = t">@t</button>
+                    }
+                </div>
+
+                @if (Actief == "Verloop")
+                {
+                    <div class="card mt-16">
+                        <div class="fw-600">Wedstrijdverloop</div>
+                        <div class="mt-12" style="display:flex; flex-direction:column; gap:14px;">
+                            @if (!Events.Any())
+                            {
+                                <div class="text-sm text-muted">Er zijn nog geen statistieken ingevoerd voor deze wedstrijd.</div>
+                            }
+                            @foreach (var e in Events)
+                            {
+                                <div class="flex gap-12" style="align-items:center;">
+                                    <div style="flex:1; text-align:right;" class="text-sm fw-600">@e.Wie<div class="text-xs text-muted">@e.Sub</div></div>
+                                    <div class="event-bullet @e.IconClass">@e.Icon</div>
+                                    <div style="width: 50px;" class="text-xs text-muted">@e.Min</div>
+                                    <div style="flex:1;"></div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+
+                @if (Actief == "Opstelling")
+                {
+                    <div class="card mt-16" style="text-align:center;">
+                        <div class="fw-600">Opstelling @(Opstelling?.Formatie ?? "nog niet gemaakt")</div>
+                        <div style="max-width: 320px; margin: 16px auto 0;" class="field-mini">
+                            @if (Opstelling is null || Opstelling.Spelers.Count == 0)
+                            {
+                                <div class="text-sm text-muted" style="padding:80px 16px;">Nog geen opstelling opgeslagen.</div>
+                            }
+                            else
+                            {
+                                @foreach (var p in Opstelling.Spelers)
+                                {
+                                    <div class="fp" style="left:@(p.VeldPositieX ?? 50)%; top:@(p.VeldPositieY ?? 50)%;">@(p.Rugnummer ?? p.SpelerId)</div>
+                                }
+                            }
+                        </div>
+                        <a class="btn-secondary mt-12" href="/coach/opstelling/@Wedstrijd.WedstrijdId">Opstelling bewerken</a>
+                    </div>
+                }
+
+                @if (Actief == "Stats")
+                {
+                    <div class="card mt-16">
+                        <div class="fw-600">Doelpuntenmakers</div>
+                        @foreach (var s in Doelpuntenmakers)
+                        {
+                            <div class="flex-between mt-12 text-sm">
+                                <div class="flex gap-8" style="align-items:center;">
+                                    <div class="avatar avatar-sm">@Initialen(s.SpelerNaam)</div>
+                                    <span class="fw-600">@s.SpelerNaam</span>
+                                </div>
+                                <span>G x @s.Goals</span>
+                            </div>
+                        }
+                        @if (!Doelpuntenmakers.Any())
+                        {
+                            <div class="text-sm text-muted mt-12">Nog geen doelpunten geregistreerd.</div>
+                        }
+                    </div>
+                }
+            </div>
+
+            <div>
+                <div class="card">
+                    <div class="fw-600">Doelpuntenmakers</div>
+                    @foreach (var s in Doelpuntenmakers)
+                    {
+                        <div class="flex-between mt-12">
+                            <div class="flex gap-8" style="align-items:center;">
+                                <div class="avatar avatar-sm">@Initialen(s.SpelerNaam)</div>
+                                <span class="text-sm fw-600">@s.SpelerNaam</span>
+                            </div>
+                            <span class="text-sm">G x @s.Goals</span>
+                        </div>
+                    }
+                    @if (!Doelpuntenmakers.Any())
+                    {
+                        <div class="text-sm text-muted mt-12">Nog geen doelpunten geregistreerd.</div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .event-bullet {
+        width: 28px; height: 28px; border-radius: 50%;
+        display:flex; align-items:center; justify-content:center;
+        background: var(--highlight); color: #1A1A1A; font-size: 14px;
+    }
+    .event-bullet.yellow { background: var(--warning); color: #fff; }
+</style>
+
+@code {
+    [Parameter] public int? Id { get; set; }
+
+    private string Actief = "Verloop";
+    private readonly string[] TabNames = new[] { "Verloop", "Opstelling", "Stats" };
+    private bool IsLoading = true;
+    private string? ErrorMessage;
+    private string TeamNaam = "Mijn team";
+    private WedstrijdDetailResponse? Wedstrijd;
+    private OpstellingResponse? Opstelling;
+    private List<StatistiekResponse> Stats = new();
+
+    private record Ev(string Wie, string Sub, string Min, string Icon, string IconClass);
+
+    private IEnumerable<Ev> Events => Stats
+        .Where(s => (s.Goals ?? 0) > 0 || (s.GeleKaarten ?? 0) > 0 || (s.RodeKaarten ?? 0) > 0)
+        .SelectMany(MaakEvents);
+
+    private IEnumerable<StatistiekResponse> Doelpuntenmakers => Stats.Where(s => (s.Goals ?? 0) > 0);
+    private string Score => Wedstrijd?.ThuisScore is null || Wedstrijd.UitScore is null
+        ? "- - -"
+        : $"{Wedstrijd.ThuisScore} - {Wedstrijd.UitScore}";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var team = await DataContext.GetTeamVoorCoachAsync();
+            if (team is null)
+            {
+                ErrorMessage = "Er kon geen team gevonden worden voor deze coach.";
+                return;
+            }
+
+            TeamNaam = team.Naam;
+            var wedstrijdId = Id ?? (await DataContext.GetWedstrijdenVoorTeamAsync(team.TeamId))
+                .OrderByDescending(w => w.Datum)
+                .ThenByDescending(w => w.StartTijd)
+                .Select(w => (int?)w.WedstrijdId)
+                .FirstOrDefault();
+
+            if (wedstrijdId is null)
+            {
+                ErrorMessage = "Er is nog geen wedstrijd gepland.";
+                return;
+            }
+
+            Wedstrijd = await DataContext.GetWedstrijdDetailAsync(wedstrijdId.Value);
+            if (Wedstrijd is null)
+            {
+                ErrorMessage = "Wedstrijd kon niet geladen worden.";
+                return;
+            }
+
+            TeamNaam = string.IsNullOrWhiteSpace(Wedstrijd.TeamNaam) ? team.Naam : Wedstrijd.TeamNaam;
+            Stats = await DataContext.GetStatistiekenVoorWedstrijdAsync(Wedstrijd.WedstrijdId);
+            Opstelling = await DataContext.GetOpstellingVoorWedstrijdAsync(Wedstrijd.WedstrijdId);
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task RapportDelen()
+    {
+        await Toast.Show("Rapport delen is afgebakend als demo-actie voor deze thesis.", "info");
+    }
+
+    private static IEnumerable<Ev> MaakEvents(StatistiekResponse s)
+    {
+        if ((s.Goals ?? 0) > 0)
+            yield return new Ev(s.SpelerNaam, $"{s.Goals} goal(s)", "-", "G", "");
+        if ((s.GeleKaarten ?? 0) > 0)
+            yield return new Ev(s.SpelerNaam, $"{s.GeleKaarten} gele kaart(en)", "-", "!", "yellow");
+        if ((s.RodeKaarten ?? 0) > 0)
+            yield return new Ev(s.SpelerNaam, $"{s.RodeKaarten} rode kaart(en)", "-", "R", "yellow");
+    }
+
+    private static string Kort(string naam)
+    {
+        var woorden = naam.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return string.Concat(woorden.Take(2).Select(w => w[0])).ToUpperInvariant();
+    }
+
+    private static string Initialen(string naam) => Kort(naam);
+}

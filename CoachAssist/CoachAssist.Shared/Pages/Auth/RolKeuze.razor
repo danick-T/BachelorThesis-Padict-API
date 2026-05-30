@@ -1,0 +1,174 @@
+@page "/rolkeuze"
+@page "/role-select"
+@page "/register/role"
+@layout CoachAssist.Shared.Layout.AuthLayout
+@using CoachAssist.Core.DTOs.Auth
+@using CoachAssist.Core.Enums
+@inject NavigationManager Navigation
+@inject ICoachAssistApiClient ApiClient
+@inject RegistrationDraftService Draft
+
+<PageTitle>Rolkeuze</PageTitle>
+
+<section class="role-select-page" aria-labelledby="role-select-title">
+    <header class="role-select-header">
+        <a class="brand" href="" aria-label="CoachAssist home">
+            <span class="brand-mark">CA</span>
+            <span>CoachAssist</span>
+        </a>
+    </header>
+
+    <div class="role-select-shell">
+        <div class="progress-row" aria-label="Stap 2 van 2">
+            <span class="progress-line"></span>
+            <span class="progress-line"></span>
+            <span class="step-label">Stap 2 van 2</span>
+        </div>
+
+        <div class="intro">
+            <h1 id="role-select-title">Wat is jouw rol?</h1>
+            <p>Kies de rol die het best bij jou past. Je kan dit later niet meer wijzigen.</p>
+        </div>
+
+        <div class="role-grid" role="radiogroup" aria-label="Kies je rol">
+            @foreach (var role in Roles)
+            {
+                var isSelected = selectedRole == role.Name;
+
+                <button class="role-card @(isSelected ? "selected" : null)"
+                        type="button"
+                        role="radio"
+                        aria-checked="@isSelected"
+                        @onclick="() => SelectRole(role.Name)">
+                    <span class="role-icon @role.IconClass" aria-hidden="true"></span>
+
+                    <span class="role-content">
+                        <span class="role-title">@role.Name</span>
+                        <span class="role-description">@role.Description</span>
+                    </span>
+
+                    @if (isSelected)
+                    {
+                        <span class="selected-badge">Geselecteerd</span>
+                    }
+                </button>
+            }
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(successMessage))
+        {
+            <p class="success-message" role="status">@successMessage</p>
+        }
+        @if (!string.IsNullOrWhiteSpace(errorMessage))
+        {
+            <p class="alert-error" role="alert">@errorMessage</p>
+        }
+
+        <div class="actions">
+            <button class="back-button" type="button" @onclick="GoBack">
+                &larr; Terug
+            </button>
+
+            <button class="create-account-button"
+                    type="button"
+                    disabled="@(string.IsNullOrWhiteSpace(selectedRole) || isSaving)"
+                    @onclick="CreateAccount">
+                @(isSaving ? "Account wordt aangemaakt..." : "Account aanmaken")
+            </button>
+        </div>
+    </div>
+</section>
+
+@code {
+    private string? selectedRole;
+    private string? successMessage;
+    private string? errorMessage;
+    private bool isSaving;
+
+    private static readonly RoleOption[] Roles =
+    [
+        new(
+            "Administrator",
+            "Beheer de club, keur spelers goed en stel teams in.",
+            "admin"),
+        new(
+            "Coach",
+            "Beheer je ploeg, plan wedstrijden en volg statistieken op.",
+            "coach"),
+        new(
+            "Speler",
+            "Bekijk je schema, geef aanwezigheid door en volg je stats.",
+            "player")
+    ];
+
+    private void SelectRole(string role)
+    {
+        selectedRole = role;
+        successMessage = null;
+        errorMessage = null;
+    }
+
+    private async Task CreateAccount()
+    {
+        if (string.IsNullOrWhiteSpace(selectedRole))
+        {
+            return;
+        }
+
+        if (!Draft.HasDraft)
+        {
+            errorMessage = "Vul eerst je accountgegevens in.";
+            Navigation.NavigateTo("/register");
+            return;
+        }
+
+        isSaving = true;
+        errorMessage = null;
+
+        try
+        {
+            var rol = selectedRole switch
+            {
+                "Administrator" => GebruikerRol.Admin,
+                "Coach" => GebruikerRol.Coach,
+                "Speler" => GebruikerRol.Speler,
+                _ => GebruikerRol.Speler
+            };
+
+            await ApiClient.RegisterAsync(new RegisterRequest
+            {
+                Voornaam = Draft.Voornaam,
+                Achternaam = Draft.Achternaam,
+                Email = Draft.Email,
+                Wachtwoord = Draft.Wachtwoord,
+                Rol = rol
+            });
+
+            Draft.Clear();
+            successMessage = "Account aangemaakt.";
+            var target = rol switch
+            {
+                GebruikerRol.Admin => "/admin",
+                GebruikerRol.Coach => "/coach",
+                GebruikerRol.Speler => "/onboarding/club",
+                _ => "/"
+            };
+            Navigation.NavigateTo(target);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void GoBack()
+    {
+        Navigation.NavigateTo("/register");
+    }
+
+    private sealed record RoleOption(string Name, string Description, string IconClass);
+}

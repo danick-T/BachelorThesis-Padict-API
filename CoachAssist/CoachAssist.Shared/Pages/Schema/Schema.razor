@@ -1,0 +1,133 @@
+@page "/speler/schema"
+@layout CoachAssist.Shared.Layout.SpelerLayout
+@using CoachAssist.Shared.Models.SpelerPages
+@inject NavigationManager Nav
+@inject CoachAssistDataContext Data
+
+<PageTitle>Mijn schema - CoachAssist</PageTitle>
+
+<div class="app-topbar">
+    <div>
+        <h1>Mijn schema</h1>
+    </div>
+    <div class="app-topbar-actions">
+        <button class="icon-btn">K</button>
+    </div>
+</div>
+
+<div class="app-content" style="max-width: 720px; margin: 0 auto;">
+    <div class="chips">
+        @foreach (var f in Filters)
+        {
+            <button class="chip @(Filter == f ? "active" : "")" @onclick="() => Filter = f">@f</button>
+        }
+    </div>
+
+    @if (Laden)
+    {
+        <div class="card mt-12">Schema wordt geladen...</div>
+    }
+    else if (!string.IsNullOrWhiteSpace(Fout))
+    {
+        <div class="card mt-12" style="border-color:#FCA5A5; background:#FEF2F2;">@Fout</div>
+    }
+    else if (!Gefilterd.Any())
+    {
+        <div class="card mt-12">Er zijn geen activiteiten voor deze filter.</div>
+    }
+    else
+    {
+        var openActies = Items.Count(i => i.Status == "Bevestig");
+        if (openActies > 0)
+        {
+            <div class="card mt-12" style="background: #FEF3C7; border-color: #FDE68A; display:flex; gap:12px; align-items:center;">
+                <span class="badge badge-afwacht" style="width:28px; height:28px; padding:0; border-radius:50%; justify-content:center;">@openActies</span>
+                <span class="text-sm">activiteiten wachten op je antwoord</span>
+            </div>
+        }
+
+        @foreach (var groep in Gefilterd.GroupBy(i => WeekLabel(i.Datum)))
+        {
+            <div class="text-xs text-muted mt-16" style="text-transform:uppercase; font-weight:600;">@groep.Key</div>
+            <div style="display:flex; flex-direction:column; gap:8px; margin-top: 8px;">
+                @foreach (var i in groep)
+                {
+                    <div class="card flex" style="align-items:center; gap:12px; cursor:pointer;" @onclick="() => Open(i)">
+                        <div class="event-date @(i.Type == SpelerSchemaType.Wedstrijd ? "wedstrijd" : "")">
+                            <div class="day">@i.Datum.ToString("dd")</div>
+                            <div class="mo">@i.Datum.ToString("MMM").ToLowerInvariant()</div>
+                        </div>
+                        <div style="flex:1;">
+                            <div class="text-xs text-muted">@FormatTijd(i.StartTijd) - @(i.Type == SpelerSchemaType.Wedstrijd ? "Wedstrijd" : "Training")</div>
+                            <div class="fw-600">@i.Titel</div>
+                            <div class="text-xs text-muted">@i.Subtitel</div>
+                        </div>
+                        <span class="badge @Badge(i.Status)">@i.Status</span>
+                    </div>
+                }
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private readonly string[] Filters = { "Alle", "Trainingen", "Wedstrijden" };
+    private string Filter = "Alle";
+    private IReadOnlyList<SpelerSchemaItem> Items = Array.Empty<SpelerSchemaItem>();
+    private bool Laden = true;
+    private string? Fout;
+
+    private IEnumerable<SpelerSchemaItem> Gefilterd => Filter switch
+    {
+        "Trainingen" => Items.Where(i => i.Type == SpelerSchemaType.Training),
+        "Wedstrijden" => Items.Where(i => i.Type == SpelerSchemaType.Wedstrijd),
+        _ => Items
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            Items = await Data.GetSpelerSchemaAsync();
+        }
+        catch (Exception ex)
+        {
+            Fout = $"Schema kon niet geladen worden: {ex.Message}";
+        }
+        finally
+        {
+            Laden = false;
+        }
+    }
+
+    private void Open(SpelerSchemaItem item)
+    {
+        if (item.Type == SpelerSchemaType.Training)
+        {
+            Nav.NavigateTo($"/speler/aanwezigheid/{item.Id}");
+        }
+        else
+        {
+            Nav.NavigateTo($"/speler/wedstrijd/{item.Id}");
+        }
+    }
+
+    private static string FormatTijd(TimeSpan tijd) => tijd.ToString(@"hh\:mm");
+
+    private static string WeekLabel(DateTime datum)
+    {
+        var today = DateTime.Today;
+        var days = (datum.Date - today).TotalDays;
+        if (days >= 0 && days < 7) return "Deze week";
+        if (days >= 7 && days < 14) return "Volgende week";
+        return datum.ToString("MMMM yyyy");
+    }
+
+    private static string Badge(string status) => status switch
+    {
+        "Bevestigd" => "badge-actief",
+        "Afwezig" => "badge-geweigerd",
+        "Bevestig" => "badge-afwacht",
+        _ => "badge-gepland"
+    };
+}

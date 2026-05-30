@@ -1,0 +1,198 @@
+@page "/coach/statistieken"
+@layout CoachAssist.Shared.Layout.CoachLayout
+@using CoachAssist.Core.DTOs.Statistiek
+@using CoachAssist.Core.DTOs.Wedstrijd
+@using CoachAssist.Core.Enums
+@inject CoachAssistDataContext DataContext
+
+<PageTitle>Seizoensstatistieken - CoachAssist</PageTitle>
+
+<div class="app-topbar">
+    <div>
+        <h1>Seizoensstatistieken</h1>
+        <div class="app-topbar-sub">@TeamNaam - @Seizoen</div>
+    </div>
+    <div class="app-topbar-actions">
+        <button class="btn-secondary">Exporteer PDF</button>
+    </div>
+</div>
+
+<div class="app-content">
+    @if (Laden)
+    {
+        <div class="card text-sm text-muted">Statistieken worden geladen...</div>
+    }
+    else if (!string.IsNullOrWhiteSpace(Fout))
+    {
+        <div class="card text-sm" style="background:#FEF2F2; border-color:#FECACA; color:#991B1B;">@Fout</div>
+    }
+    else
+    {
+        <div class="stats-row" style="grid-template-columns: repeat(5, 1fr);">
+            <div class="stat-tile"><div class="stat-tile-label">Gespeeld</div><div class="stat-tile-value">@Gespeeld</div><div class="text-xs text-muted">wedstrijden</div></div>
+            <div class="stat-tile"><div class="stat-tile-label">Gewonnen</div><div class="stat-tile-value">@Gewonnen</div><div class="text-xs text-muted">overwinningen</div></div>
+            <div class="stat-tile"><div class="stat-tile-label">Gelijk</div><div class="stat-tile-value">@Gelijk</div><div class="text-xs text-muted">gelijke spelen</div></div>
+            <div class="stat-tile"><div class="stat-tile-label">Verloren</div><div class="stat-tile-value">@Verloren</div><div class="text-xs text-muted">nederlagen</div></div>
+            <div class="stat-tile"><div class="stat-tile-label">Doelsaldo</div><div class="stat-tile-value" style="color: var(--success);">@DoelsaldoTekst</div><div class="text-xs text-muted">@GoalsVoor-@GoalsTegen</div></div>
+        </div>
+
+        <div class="row-2col mt-24">
+            <div class="card">
+                <div class="flex-between"><div class="fw-600">Doelpunten per maand</div><div class="text-xs text-muted">Gemaakt vs. tegen</div></div>
+                @if (!Doelpunten.Any())
+                {
+                    <div class="text-sm text-muted mt-12">Er zijn nog geen gespeelde wedstrijden.</div>
+                }
+                else
+                {
+                    <div class="flex gap-8 mt-16" style="align-items:flex-end; height: 180px; justify-content: space-around;">
+                        @{ var maxV = Math.Max(1, Doelpunten.Max(m => Math.Max(m.Voor, m.Tegen))); }
+                        @foreach (var m in Doelpunten)
+                        {
+                            <div style="display:flex; flex-direction:column; align-items:center; gap: 4px; flex:1;">
+                                <div style="display:flex; align-items:flex-end; gap:2px; height: 140px;">
+                                    <div style="width: 14px; background: var(--success); height: @((int)(m.Voor * 100.0 / maxV))%; border-radius: 4px 4px 0 0; position:relative;">
+                                        <span style="position:absolute; top:-18px; left:50%; transform: translateX(-50%); font-size:11px; font-weight:600; color: var(--success);">@m.Voor</span>
+                                    </div>
+                                    <div style="width: 14px; background: #FCA5A5; height: @((int)(m.Tegen * 100.0 / maxV))%; border-radius: 4px 4px 0 0; position:relative;">
+                                        <span style="position:absolute; top:-18px; left:50%; transform: translateX(-50%); font-size:11px; font-weight:600; color: var(--danger);">@m.Tegen</span>
+                                    </div>
+                                </div>
+                                <span class="text-xs text-muted">@m.Naam</span>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+            <div class="card">
+                <div class="flex-between"><div class="fw-600">Recente vorm</div><div class="text-xs text-muted">Laatste 10</div></div>
+                <div class="flex gap-4 mt-12" style="flex-wrap:wrap;">
+                    @if (!Vorm.Any())
+                    {
+                        <span class="text-sm text-muted">Nog geen resultaten.</span>
+                    }
+                    @foreach (var r in Vorm)
+                    {
+                        <span class="badge @(r == "W" ? "badge-gespeeld" : r == "G" ? "badge-afwacht" : "badge-geweigerd")" style="width:32px; height:32px; padding:0; border-radius:6px; justify-content:center; font-size:13px;">@r</span>
+                    }
+                </div>
+                <div class="flex gap-16 mt-16">
+                    <div><div class="text-xs text-muted">Win-ratio</div><div class="fw-600">@WinRatio%</div></div>
+                    <div><div class="text-xs text-muted">Punten</div><div class="fw-600">@Punten</div></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row-2col mt-24">
+            <div class="card">
+                <div class="fw-600">Topscorers</div>
+                @if (!Topscorers.Any())
+                {
+                    <div class="text-sm text-muted mt-12">Er zijn nog geen spelerstatistieken.</div>
+                }
+                @{ int rank = 0; }
+                @foreach (var t in Topscorers)
+                {
+                    rank++;
+                    <div class="flex-between" style="padding: 12px 0; border-bottom: 1px solid var(--border);">
+                        <div class="flex gap-12" style="align-items:center;">
+                            <div class="text-muted" style="width: 18px;">@rank</div>
+                            <div class="avatar avatar-sm">@Initialen(t.Voornaam, t.Achternaam)</div>
+                            <div class="fw-600 text-sm">@($"{t.Voornaam} {t.Achternaam}".Trim())</div>
+                        </div>
+                        <div class="flex gap-8" style="align-items:center;">
+                            <span class="stat-chip stat-chip-assist">A @t.TotaalAssists</span>
+                            <span class="fw-600" style="font-size: 18px;">@t.TotaalGoals</span>
+                        </div>
+                    </div>
+                }
+            </div>
+            <div class="card">
+                <div class="fw-600">Speelminuten</div>
+                @foreach (var a in MinutenLeiders)
+                {
+                    <div style="padding: 8px 0; border-bottom: 1px solid var(--border);">
+                        <div class="flex-between text-sm">
+                            <div class="flex gap-8" style="align-items:center;"><div class="avatar avatar-sm">@Initialen(a.Voornaam, a.Achternaam)</div>@($"{a.Voornaam} {a.Achternaam}".Trim())</div>
+                            <span class="fw-600">@a.TotaalMinuten'</span>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool Laden = true;
+    private string? Fout;
+    private string TeamNaam = "Mijn team";
+    private string Seizoen = "Seizoen";
+    private SeizoenTeamOverzicht? TeamStats;
+    private readonly List<WedstrijdResponse> Wedstrijden = new();
+
+    private IEnumerable<WedstrijdResponse> GespeeldeWedstrijden => Wedstrijden
+        .Where(w => w.Status == WedstrijdStatus.Gespeeld && w.ThuisScore.HasValue && w.UitScore.HasValue);
+
+    private int Gespeeld => GespeeldeWedstrijden.Count();
+    private int Gewonnen => GespeeldeWedstrijden.Count(w => w.ThuisScore > w.UitScore);
+    private int Gelijk => GespeeldeWedstrijden.Count(w => w.ThuisScore == w.UitScore);
+    private int Verloren => GespeeldeWedstrijden.Count(w => w.ThuisScore < w.UitScore);
+    private int GoalsVoor => GespeeldeWedstrijden.Sum(w => w.ThuisScore ?? 0);
+    private int GoalsTegen => GespeeldeWedstrijden.Sum(w => w.UitScore ?? 0);
+    private int Doelsaldo => GoalsVoor - GoalsTegen;
+    private string DoelsaldoTekst => Doelsaldo > 0 ? $"+{Doelsaldo}" : Doelsaldo.ToString();
+    private int Punten => Gewonnen * 3 + Gelijk;
+    private int WinRatio => Gespeeld == 0 ? 0 : (int)Math.Round(Gewonnen * 100.0 / Gespeeld);
+
+    private IReadOnlyList<Maand> Doelpunten => GespeeldeWedstrijden
+        .GroupBy(w => w.Datum.ToString("MMM").ToLowerInvariant())
+        .Select(g => new Maand(g.Key, g.Sum(w => w.ThuisScore ?? 0), g.Sum(w => w.UitScore ?? 0)))
+        .ToList();
+
+    private IReadOnlyList<string> Vorm => GespeeldeWedstrijden
+        .OrderByDescending(w => w.Datum)
+        .Take(10)
+        .Select(w => w.ThuisScore > w.UitScore ? "W" : w.ThuisScore == w.UitScore ? "G" : "V")
+        .ToList();
+
+    private IEnumerable<SeizoenSpelerStats> Topscorers => TeamStats?.Spelers
+        .OrderByDescending(s => s.TotaalGoals)
+        .ThenByDescending(s => s.TotaalAssists)
+        .Take(5) ?? Enumerable.Empty<SeizoenSpelerStats>();
+
+    private IEnumerable<SeizoenSpelerStats> MinutenLeiders => TeamStats?.Spelers
+        .OrderByDescending(s => s.TotaalMinuten)
+        .Take(5) ?? Enumerable.Empty<SeizoenSpelerStats>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var team = await DataContext.GetTeamVoorCoachAsync();
+            if (team is null)
+            {
+                Fout = "Er kon geen team gevonden worden voor deze coach.";
+                return;
+            }
+
+            TeamNaam = team.Naam;
+            Seizoen = team.Seizoen;
+            TeamStats = await DataContext.GetSeizoenVoorTeamAsync(team.TeamId);
+            Wedstrijden.AddRange(await DataContext.GetWedstrijdenVoorTeamAsync(team.TeamId));
+        }
+        catch (Exception ex)
+        {
+            Fout = $"Statistieken konden niet geladen worden: {ex.Message}";
+        }
+        finally
+        {
+            Laden = false;
+        }
+    }
+
+    private static string Initialen(string voornaam, string achternaam) =>
+        $"{voornaam.FirstOrDefault()}{achternaam.FirstOrDefault()}".ToUpperInvariant();
+
+    private sealed record Maand(string Naam, int Voor, int Tegen);
+}

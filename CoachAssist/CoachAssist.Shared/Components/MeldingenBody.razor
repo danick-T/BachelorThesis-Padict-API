@@ -1,0 +1,64 @@
+@inject Toast Toast
+
+<div class="app-topbar">
+    <div class="flex gap-8" style="align-items:center;">
+        <h1>Meldingen</h1>
+    </div>
+    <div class="app-topbar-actions">
+        <button class="btn-secondary" @onclick="MarkeerAlles">Alles gelezen</button>
+    </div>
+</div>
+
+<div class="app-content" style="max-width: 720px; margin: 0 auto;">
+    <div class="chips">
+        <button class="chip @(Tab == "Alles" ? "active" : "")" @onclick='() => Tab = "Alles"'>Alles <span class="chip-count">@Items.Count</span></button>
+        <button class="chip @(Tab == "Ongelezen" ? "active" : "")" @onclick='() => Tab = "Ongelezen"'>Ongelezen <span class="chip-count">@Items.Count(i => i.Ongelezen)</span></button>
+        <button class="chip @(Tab == "Wedstrijden" ? "active" : "")" @onclick='() => Tab = "Wedstrijden"'>Wedstrijden <span class="chip-count">@Items.Count(i => i.Categorie == "Wedstrijd")</span></button>
+    </div>
+
+    @foreach (var groep in Gefilterd.GroupBy(i => i.Wanneer))
+    {
+        <div class="text-xs text-muted mt-16" style="text-transform:uppercase; font-weight:600;">@groep.Key</div>
+        <div class="card mt-8" style="padding: 0;">
+            @foreach (var n in groep)
+            {
+                <div class="flex gap-12" style="padding: 12px 14px; border-bottom: 1px solid var(--border); align-items:flex-start;">
+                    <div class="avatar avatar-sm" style="background: @n.IconBg; color: @n.IconColor;">@n.Icon</div>
+                    <div style="flex:1;">
+                        <div class="flex-between"><div class="fw-600 text-sm">@n.Titel</div><div class="text-xs text-muted">@n.Tijd</div></div>
+                        <div class="text-xs text-muted">@n.Body</div>
+                    </div>
+                    @if (n.Ongelezen) { <span style="width: 8px; height: 8px; background: var(--danger); border-radius: 50%; margin-top: 8px;"></span> }
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    record M(string Wanneer, string Icon, string IconBg, string IconColor, string Titel, string Tijd, string Body, string Categorie, bool Ongelezen);
+    private string Tab = "Alles";
+    private List<M> Items = new()
+    {
+        new M("Vandaag", "⚽", "#EFF6FF", "#3B82F6", "Wedstrijdherinnering", "10:42", "U17b vs SK Lot · zaterdag 14:30", "Wedstrijd", true),
+        new M("Vandaag", "✓", "#DCFCE7", "var(--success)", "Bevestig aanwezigheid", "09:15", "Training dinsdag 21 mei · 19:00", "Training", true),
+        new M("Gisteren", "📊", "#FEF3C7", "#D97706", "Statistieken bijgewerkt", "21:08", "Coach Thomas heeft de stats van vs Racing Leuven ingevoerd.", "Stats", false),
+        new M("Gisteren", "💬", "#EEF2FF", "#4338CA", "Bericht van coach", "18:22", "\"Goeie match jongens, training morgen wel om 19u stipt aub.\"", "Bericht", false),
+        new M("Deze week", "🟢", "#DCFCE7", "var(--success)", "Je staat in de basis", "do", "Coach heeft je opgesteld bij wedstrijd vs Racing Leuven", "Wedstrijd", false),
+        new M("Deze week", "📅", "#EFF6FF", "#3B82F6", "Nieuwe training toegevoegd", "wo", "Donderdag 23 mei · 19:00 · Terrein A", "Training", false),
+        new M("Deze week", "👥", "#EEF2FF", "#4338CA", "Nieuwe speler in het team", "di", "Niels Verheyden is goedgekeurd als spits", "Team", false),
+    };
+
+    private IEnumerable<M> Gefilterd => Tab switch
+    {
+        "Ongelezen" => Items.Where(i => i.Ongelezen),
+        "Wedstrijden" => Items.Where(i => i.Categorie == "Wedstrijd"),
+        _ => Items
+    };
+
+    private async Task MarkeerAlles()
+    {
+        Items = Items.Select(i => i with { Ongelezen = false }).ToList();
+        await Toast.Show("Alle meldingen gemarkeerd als gelezen");
+    }
+}

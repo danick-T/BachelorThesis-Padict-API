@@ -1,0 +1,167 @@
+@page "/coach/training/{Id:int?}"
+@layout CoachAssist.Shared.Layout.CoachLayout
+@using CoachAssist.Core.DTOs.Aanwezigheid
+@using CoachAssist.Core.DTOs.Speler
+@using CoachAssist.Core.DTOs.Training
+@inject CoachAssistDataContext DataContext
+@inject Toast Toast
+
+<PageTitle>Trainingaanwezigheid - CoachAssist</PageTitle>
+
+<div class="app-topbar">
+    <div>
+        <div class="text-xs text-muted">Kalender - Trainingen - @TrainingDatum</div>
+        <h1>@TrainingTitel</h1>
+        <div class="app-topbar-sub">@TrainingSubtitel</div>
+    </div>
+    <div class="app-topbar-actions">
+        <a class="btn-secondary" href="/coach/training/nieuw">Nieuwe training</a>
+        <button class="btn-primary" @onclick="Herinneren">Iedereen herinneren</button>
+    </div>
+</div>
+
+<div class="app-content">
+    @if (IsLoading)
+    {
+        <div class="card text-sm text-muted">Aanwezigheden worden geladen...</div>
+    }
+    else if (!string.IsNullOrWhiteSpace(ErrorMessage))
+    {
+        <div class="card text-sm" style="background:#FEF2F2; border-color:#FECACA; color:#991B1B;">@ErrorMessage</div>
+    }
+    else
+    {
+        <div class="card">
+            <div class="flex gap-16" style="align-items:center;">
+                <div class="donut" style="--p-ok: @(AanwezigPercentage)%; --p-ko: @(AfwezigPercentage)%;"><span class="donut-label">@(Aanwezig.Count())/@Spelers.Count</span></div>
+                <div style="flex:1; display:flex; gap:24px; flex-wrap:wrap;">
+                    <div><div class="text-xs text-muted">Aanwezig</div><div class="fw-600" style="font-size:24px;">@(Aanwezig.Count())</div></div>
+                    <div><div class="text-xs text-muted">Afwezig</div><div class="fw-600" style="font-size:24px;">@(Afwezig.Count())</div></div>
+                    <div><div class="text-xs text-muted">Geen reactie</div><div class="fw-600" style="font-size:24px;">@(GeenReactie.Count())</div></div>
+                </div>
+            </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-top: 16px;" class="att-grid">
+            <div>
+                <div class="fw-600 mt-8"><span style="color: var(--success);">●</span> Aanwezig <span class="text-muted text-sm">@(Aanwezig.Count())</span></div>
+                <div class="card mt-8" style="padding: 0;">
+                    @foreach (var s in Aanwezig)
+                    {
+                        <div class="flex gap-8" style="padding:10px 12px; border-bottom:1px solid var(--border); align-items:center;">
+                            <div class="avatar avatar-sm">@Initialen(s.SpelerNaam)</div>
+                            <div style="flex:1;">
+                                <div class="text-sm fw-600">@s.SpelerNaam</div>
+                                <div class="text-xs text-muted">Bevestigd</div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+            <div>
+                <div class="fw-600 mt-8"><span style="color: var(--danger);">●</span> Afwezig <span class="text-muted text-sm">@(Afwezig.Count())</span></div>
+                <div class="card mt-8" style="padding: 0;">
+                    @foreach (var s in Afwezig)
+                    {
+                        <div class="flex gap-8" style="padding:10px 12px; border-bottom:1px solid var(--border); align-items:center;">
+                            <div class="avatar avatar-sm">@Initialen(s.SpelerNaam)</div>
+                            <div style="flex:1;">
+                                <div class="text-sm fw-600">@s.SpelerNaam</div>
+                                <div class="text-xs text-muted">@(string.IsNullOrWhiteSpace(s.Reden) ? "Geen reden opgegeven" : s.Reden)</div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+            <div>
+                <div class="fw-600 mt-8"><span style="color: var(--text-muted);">●</span> Geen reactie <span class="text-muted text-sm">@(GeenReactie.Count())</span></div>
+                <div class="card mt-8" style="padding: 0;">
+                    @foreach (var s in GeenReactie)
+                    {
+                        <div class="flex gap-8" style="padding:10px 12px; border-bottom:1px solid var(--border); align-items:center;">
+                            <div class="avatar avatar-sm">@Initialen(s.Voornaam, s.Achternaam)</div>
+                            <div class="text-sm fw-600">@($"{s.Voornaam} {s.Achternaam}".Trim())</div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .att-grid { grid-template-columns: 1fr 1fr 1fr; }
+    @@media (max-width: 1000px) { .att-grid { grid-template-columns: 1fr; } }
+</style>
+
+@code {
+    [Parameter] public int? Id { get; set; }
+
+    private bool IsLoading = true;
+    private string? ErrorMessage;
+    private TrainingResponse? Training;
+    private List<SpelerResponse> Spelers = new();
+    private List<AanwezigheidResponse> Reacties = new();
+
+    private IEnumerable<AanwezigheidResponse> Aanwezig => Reacties.Where(a => a.Aanwezig);
+    private IEnumerable<AanwezigheidResponse> Afwezig => Reacties.Where(a => !a.Aanwezig);
+    private IEnumerable<SpelerResponse> GeenReactie => Spelers.Where(s => Reacties.All(a => a.SpelerId != s.SpelerId));
+    private int AanwezigPercentage => Spelers.Count == 0 ? 0 : (int)Math.Round(Aanwezig.Count() * 100.0 / Spelers.Count);
+    private int AfwezigPercentage => Spelers.Count == 0 ? 0 : (int)Math.Round(Afwezig.Count() * 100.0 / Spelers.Count);
+    private string TrainingDatum => Training?.Datum.ToString("dd/MM/yyyy") ?? "Training";
+    private string TrainingTitel => Training is null ? "Training" : $"Training - {Training.Datum:dd/MM/yyyy} - {Training.StartTijd:hh\\:mm}";
+    private string TrainingSubtitel => Training is null ? "Training" : $"{Training.TerreinNaam} - {Training.Status}";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var team = await DataContext.GetTeamVoorCoachAsync();
+            if (team is null)
+            {
+                ErrorMessage = "Er kon geen team gevonden worden voor deze coach.";
+                return;
+            }
+
+            Spelers = await DataContext.GetSpelersVoorTeamAsync(team.TeamId);
+            var trainingen = await DataContext.GetTrainingenVoorTeamAsync(team.TeamId);
+            Training = Id.HasValue
+                ? trainingen.FirstOrDefault(t => t.TrainingId == Id.Value)
+                : trainingen.OrderBy(t => t.Datum).ThenBy(t => t.StartTijd).FirstOrDefault();
+
+            if (Training is null)
+            {
+                ErrorMessage = "Training kon niet gevonden worden.";
+                return;
+            }
+
+            Reacties = await DataContext.GetAanwezighedenVoorTrainingAsync(Training.TrainingId);
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task Herinneren()
+    {
+        await Toast.Show($"Herinnering gemarkeerd voor {GeenReactie.Count()} spelers", "info");
+    }
+
+    private static string Initialen(string naam)
+    {
+        var woorden = naam.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return string.Concat(woorden.Take(2).Select(w => w[0])).ToUpperInvariant();
+    }
+
+    private static string Initialen(string voornaam, string achternaam)
+    {
+        var eerste = string.IsNullOrWhiteSpace(voornaam) ? "" : voornaam[..1];
+        var tweede = string.IsNullOrWhiteSpace(achternaam) ? "" : achternaam[..1];
+        return $"{eerste}{tweede}".ToUpperInvariant();
+    }
+}

@@ -1,0 +1,174 @@
+@page "/admin/club"
+@layout CoachAssist.Shared.Layout.AdminLayout
+@using CoachAssist.Core.DTOs.Club
+@using CoachAssist.Core.DTOs.Team
+@inject Toast Toast
+@inject CoachAssistDataContext DataContext
+
+<PageTitle>Club - CoachAssist</PageTitle>
+
+<div class="app-topbar">
+    <div>
+        <div class="text-xs text-muted">Club</div>
+        <h1>@(Club?.Naam ?? "Club")</h1>
+        <div class="app-topbar-sub">@(Club?.Stad ?? "") · @Teams.Sum(t => t.Spelers.Count) leden · @Teams.Count teams</div>
+    </div>
+    <div class="app-topbar-actions">
+        <button class="btn-secondary">Bewerken</button>
+        <button class="btn-primary" @onclick='() => Toast.Show("Team toevoegen komt later")'>+ Nieuw team</button>
+    </div>
+</div>
+
+<div class="app-content">
+    @if (IsLoading)
+    {
+        <div class="card text-sm text-muted">Clubgegevens worden geladen...</div>
+    }
+    else if (!string.IsNullOrWhiteSpace(ErrorMessage))
+    {
+        <div class="card text-sm" style="background:#FEF2F2; border-color:#FECACA; color:#991B1B;">@ErrorMessage</div>
+    }
+    else
+    {
+        <div style="display:grid; grid-template-columns: 2fr 1fr; gap: 24px;" class="club-grid">
+            <div>
+                <div class="card" style="background: var(--primary); height: 140px; border:none; display:flex; align-items:flex-end; padding: 20px;">
+                    <div class="entity-logo" style="width:64px; height:64px;">@ClubInitialen</div>
+                </div>
+
+                <div class="card mt-16">
+                    <div class="flex-between">
+                        <div class="fw-600">Teams</div>
+                        <div class="chips">
+                            @foreach (var f in TeamFilters)
+                            {
+                                <button class="chip @(Filter == f ? "active" : "")" @onclick="() => Filter = f">@f</button>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="mt-12" style="padding: 0;">
+                        <div class="flex desktop-only" style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; padding: 8px 0; border-bottom: 1px solid var(--border);">
+                            <div style="flex:2;">Team</div>
+                            <div style="flex:1;">Categorie</div>
+                            <div style="flex:2;">Coach</div>
+                            <div style="flex:1;">Spelers</div>
+                            <div style="width:80px;"></div>
+                        </div>
+                        @foreach (var t in Gefilterd)
+                        {
+                            <div class="flex" style="padding: 12px 0; border-bottom: 1px solid var(--border); align-items:center;">
+                                <div style="flex:2;" class="flex gap-8"><div class="entity-logo" style="width:36px; height:36px;">@Kort(t.Naam)</div><span class="fw-600 text-sm">@t.Naam</span></div>
+                                <div style="flex:1;"><span class="badge badge-gepland">@Categorie(t.Naam)</span></div>
+                                <div style="flex:2;" class="flex gap-8" ><div class="avatar avatar-sm">@Initialen(t.CoachNaam)</div><span class="text-sm">@(t.CoachNaam ?? "Geen coach")</span></div>
+                                <div style="flex:1;" class="fw-600">@t.Spelers.Count</div>
+                                <div style="width:80px;"><a class="text-sm fw-600" href="#">Beheren →</a></div>
+                            </div>
+                        }
+                        @if (!Gefilterd.Any())
+                        {
+                            <div class="text-sm text-muted" style="padding: 20px 0;">Geen teams gevonden voor deze filter.</div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <div class="card">
+                    <div class="fw-600">Contact</div>
+                    <div class="text-xs text-muted mt-12">Stad</div>
+                    <div class="text-sm">@(Club?.Stad ?? "Onbekend")</div>
+                    <div class="text-xs text-muted mt-12">Teams</div>
+                    <div class="text-sm">@Teams.Count</div>
+                    <div class="text-xs text-muted mt-12">Terreinen</div>
+                    <div class="text-sm">@AantalTerreinen</div>
+                </div>
+
+                <div class="card mt-16">
+                    <div class="flex-between"><div class="fw-600">Coaches</div><a class="text-sm fw-600" href="#" style="color: var(--primary);">+ Uitnodigen</a></div>
+                    @foreach (var c in Coaches)
+                    {
+                        <div class="flex gap-12 mt-12" style="align-items:center;">
+                            <div class="avatar avatar-sm">@Initialen(c.CoachNaam)</div>
+                            <div>
+                                <div class="text-sm fw-600">@c.CoachNaam</div>
+                                <div class="text-xs text-muted">@c.Naam</div>
+                            </div>
+                        </div>
+                    }
+                    @if (!Coaches.Any())
+                    {
+                        <div class="text-sm text-muted mt-12">Er zijn nog geen coaches gekoppeld.</div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .club-grid { grid-template-columns: 2fr 1fr; }
+    @@media (max-width: 1100px) { .club-grid { grid-template-columns: 1fr; } }
+</style>
+
+@code {
+    private ClubResponse? Club;
+    private bool IsLoading = true;
+    private string? ErrorMessage;
+    private string Filter = "Alle";
+    private int AantalTerreinen;
+    private readonly List<TeamDetailResponse> Teams = new();
+    private readonly string[] TeamFilters = ["Alle", "Jeugd", "Senioren"];
+
+    private IEnumerable<TeamDetailResponse> Gefilterd =>
+        Filter == "Alle" ? Teams : Teams.Where(t => Soort(t.Naam) == Filter);
+
+    private IEnumerable<TeamDetailResponse> Coaches =>
+        Teams.Where(t => !string.IsNullOrWhiteSpace(t.CoachNaam))
+             .GroupBy(t => t.CoachNaam)
+             .Select(g => g.First());
+
+    private string ClubInitialen => Initialen(Club?.Naam);
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            Club = await DataContext.GetEersteClubAsync();
+            if (Club is null)
+            {
+                ErrorMessage = "Er kon geen club gevonden worden.";
+                return;
+            }
+
+            Teams.AddRange(await DataContext.GetTeamsVoorClubAsync(Club.ClubId));
+            AantalTerreinen = (await DataContext.GetTerreinenVoorClubAsync(Club.ClubId)).Count;
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private static string Kort(string? naam)
+    {
+        if (string.IsNullOrWhiteSpace(naam)) return "?";
+        return naam.Length <= 5 ? naam : string.Concat(naam.Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(w => w[0])).ToUpperInvariant();
+    }
+
+    private static string Initialen(string? naam)
+    {
+        if (string.IsNullOrWhiteSpace(naam)) return "?";
+        var delen = naam.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return string.Concat(delen.Take(2).Select(d => d[0])).ToUpperInvariant();
+    }
+
+    private static string Categorie(string naam) =>
+        naam.StartsWith("U", StringComparison.OrdinalIgnoreCase) ? "Jeugd" : "Senioren";
+
+    private static string Soort(string naam) => Categorie(naam);
+}

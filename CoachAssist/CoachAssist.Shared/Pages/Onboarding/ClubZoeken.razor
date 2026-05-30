@@ -1,0 +1,125 @@
+@page "/onboarding/club"
+@layout CoachAssist.Shared.Layout.AuthLayout
+@using CoachAssist.Core.DTOs.Club
+@inject NavigationManager Nav
+@inject CoachAssistDataContext DataContext
+@inject Toast Toast
+
+<PageTitle>Vind je club - CoachAssist</PageTitle>
+
+<div class="onboarding-shell">
+    <div class="onboarding-card">
+        <div style="display:flex; gap:6px; align-items:center; margin-bottom:12px;">
+            <span style="flex:1; height:4px; background: var(--primary); border-radius:999px;"></span>
+            <span style="flex:1; height:4px; background: #E5E7EB; border-radius:999px;"></span>
+            <span class="text-xs text-muted">Stap 1 van 2</span>
+        </div>
+        <h1 style="font-size: 24px; font-weight: 700;">Vind je club</h1>
+        <input class="search-input mt-12" placeholder="Zoek je club..." @bind="Zoek" @bind:event="oninput" @bind:after="LaadClubs" />
+
+        @if (IsLoading)
+        {
+            <div class="card mt-12 text-sm text-muted">Clubs worden geladen...</div>
+        }
+        else if (!string.IsNullOrWhiteSpace(ErrorMessage))
+        {
+            <div class="card mt-12 text-sm" style="background:#FEF2F2; border-color:#FECACA; color:#991B1B;">@ErrorMessage</div>
+        }
+        else
+        {
+            <div class="text-xs text-muted mt-8">@Clubs.Count resultaten</div>
+            <div style="display:flex; flex-direction:column; gap:8px; margin-top:12px;">
+                @foreach (var c in Clubs)
+                {
+                    <button class="entity-card" style="text-align:left; width:100%; cursor:pointer;" @onclick="() => Kies(c)">
+                        <div class="entity-logo">@Kort(c.Naam)</div>
+                        <div style="flex:1;">
+                            <div class="fw-600">@c.Naam</div>
+                            <div class="text-xs text-muted">@c.Stad</div>
+                        </div>
+                        <span class="text-muted">></span>
+                    </button>
+                }
+                @if (Clubs.Count == 0)
+                {
+                    <div class="text-sm text-muted" style="text-align:center; padding: 24px;">Geen clubs gevonden.</div>
+                }
+            </div>
+        }
+
+        <div class="card mt-16" style="text-align:center; background: #F9FAFB;">
+            <div class="text-xs text-muted">Je club niet gevonden?</div>
+            <div class="fw-600">Vraag dit aan je club of coach.</div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .onboarding-shell {
+        min-height: 100vh; background: var(--bg);
+        padding: 24px 16px;
+        display: flex; align-items: flex-start; justify-content: center;
+    }
+    .onboarding-card { background: #fff; border-radius: 16px; padding: 24px; max-width: 520px; width: 100%; box-shadow: 0 4px 12px rgba(0,0,0,0.04); }
+</style>
+
+@code {
+    private string Zoek = "";
+    private bool IsLoading = true;
+    private bool IsSubmitting;
+    private string? ErrorMessage;
+    private List<ClubResponse> Clubs = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LaadClubs();
+    }
+
+    private async Task LaadClubs()
+    {
+        IsLoading = true;
+        ErrorMessage = null;
+        try
+        {
+            Clubs = await DataContext.ZoekClubsAsync(Zoek);
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task Kies(ClubResponse club)
+    {
+        if (IsSubmitting)
+        {
+            return;
+        }
+
+        IsSubmitting = true;
+        try
+        {
+            await DataContext.MaakClubAanvraagAsync(club.ClubId);
+            await Toast.Show($"Aanvraag verzonden naar {club.Naam}", "success");
+            Nav.NavigateTo($"/onboarding/team?clubId={club.ClubId}");
+        }
+        catch (Exception ex)
+        {
+            await Toast.Show(ex.Message, "error", 3500);
+        }
+        finally
+        {
+            IsSubmitting = false;
+        }
+    }
+
+    private static string Kort(string naam)
+    {
+        var woorden = naam.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return string.Concat(woorden.Take(2).Select(w => w[0])).ToUpperInvariant();
+    }
+}

@@ -1,0 +1,81 @@
+@inherits LayoutComponentBase
+@inject CoachAssistDataContext DataContext
+
+<div class="app-shell">
+    <aside class="app-sidebar">
+        <div class="app-sidebar-brand">
+            <div class="brand-logo">CA</div>
+            <div>
+                <div class="app-sidebar-brand-text">CoachAssist</div>
+                <div class="app-sidebar-brand-sub">@ClubNaam</div>
+            </div>
+        </div>
+
+        <nav class="app-sidebar-nav">
+            <NavLink class="app-nav-item" href="/speler" Match="NavLinkMatch.All">
+                <span class="app-nav-icon">H</span> Home
+            </NavLink>
+            <NavLink class="app-nav-item" href="/speler/schema">
+                <span class="app-nav-icon">S</span> Schema
+            </NavLink>
+            <NavLink class="app-nav-item" href="/speler/stats">
+                <span class="app-nav-icon">%</span> Mijn stats
+            </NavLink>
+            <NavLink class="app-nav-item" href="/speler/meldingen">
+                <span class="app-nav-icon">!</span> Meldingen
+            </NavLink>
+            <NavLink class="app-nav-item" href="/speler/profiel">
+                <span class="app-nav-icon">P</span> Profiel
+            </NavLink>
+        </nav>
+
+        <div class="app-sidebar-user">
+            <div class="avatar avatar-sm">@Initialen</div>
+            <div>
+                <div class="app-sidebar-user-name">@SpelerNaam</div>
+                <div class="app-sidebar-user-role">Speler - @Rugnummer</div>
+            </div>
+        </div>
+    </aside>
+
+    <div class="app-main">
+        @Body
+    </div>
+
+    <nav class="bottom-tabs">
+        <NavLink href="/speler" Match="NavLinkMatch.All"><span class="tab-icon">H</span>Home</NavLink>
+        <NavLink href="/speler/schema"><span class="tab-icon">S</span>Schema</NavLink>
+        <NavLink href="/speler/stats"><span class="tab-icon">%</span>Stats</NavLink>
+        <NavLink href="/speler/profiel"><span class="tab-icon">P</span>Profiel</NavLink>
+    </nav>
+
+    <CoachAssist.Shared.Components.ToastHost />
+</div>
+
+@code {
+    private string ClubNaam = "Club";
+    private string SpelerNaam = "Speler";
+    private string Initialen = "S";
+    private string Rugnummer = "#-";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var speler = await DataContext.GetHuidigeSpelerAsync();
+            if (speler is null)
+            {
+                return;
+            }
+
+            ClubNaam = string.IsNullOrWhiteSpace(speler.ClubNaam) ? "Club" : speler.ClubNaam;
+            SpelerNaam = speler.VolledigeNaam;
+            Initialen = speler.Initialen;
+            Rugnummer = speler.Rugnummer.HasValue ? $"#{speler.Rugnummer}" : "#-";
+        }
+        catch
+        {
+            // De pagina zelf toont de concrete laadfout.
+        }
+    }
+}

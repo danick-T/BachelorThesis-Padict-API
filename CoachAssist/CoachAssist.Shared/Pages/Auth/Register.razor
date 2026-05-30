@@ -1,0 +1,131 @@
+@page "/register"
+@page "/registreren"
+@layout CoachAssist.Shared.Layout.AuthLayout
+@inject NavigationManager Nav
+@inject RegistrationDraftService Draft
+
+<PageTitle>Account aanmaken — CoachAssist</PageTitle>
+
+<div class="login-page">
+    <div class="brand-panel">
+        <div class="brand-top">
+            <div class="brand-logo">CA</div>
+            <span class="brand-name">CoachAssist</span>
+        </div>
+        <div class="brand-bottom">
+            <h2 class="brand-tagline">Start in 2 stappen.<br />Zonder ruis.</h2>
+            <ol style="list-style:none; padding:0; margin: 16px 0 0; color:#fff;">
+                <li style="display:flex; gap:10px; margin-bottom: 10px;"><span class="step-num">1</span>Maak je account aan</li>
+                <li style="display:flex; gap:10px; margin-bottom: 10px;"><span class="step-num">2</span>Kies je rol — coach, speler of admin</li>
+                <li style="display:flex; gap:10px; opacity:.6;"><span class="step-num">→</span>Vraag aan bij je club en je bent vertrokken</li>
+            </ol>
+        </div>
+    </div>
+
+    <div class="form-panel">
+        <div class="form-card">
+            <div class="form-logo mobile-only">
+                <div class="brand-logo">CA</div>
+                <span class="form-logo-name">CoachAssist</span>
+            </div>
+
+            <div class="progress-row" style="display:flex; gap:6px; align-items:center; margin-bottom:12px;">
+                <span style="flex:1; height:4px; background: var(--primary); border-radius:999px;"></span>
+                <span style="flex:1; height:4px; background: #E5E7EB; border-radius:999px;"></span>
+                <span class="text-xs text-muted">Stap 1 van 2</span>
+            </div>
+
+            <h1 class="form-title">Account aanmaken</h1>
+            <p class="form-subtitle">Vul je gegevens in om te starten.</p>
+
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <div class="field"><label class="field-label">Voornaam</label><input class="field-input" @bind="Voornaam" /></div>
+                <div class="field"><label class="field-label">Achternaam</label><input class="field-input" @bind="Achternaam" /></div>
+            </div>
+
+            <div class="field"><label class="field-label">E-mailadres</label><input class="field-input" type="email" @bind="Email" /></div>
+            <div class="field"><label class="field-label">Geboortedatum</label><input class="field-input" type="date" @bind="Geboortedatum" /></div>
+            <div class="field">
+                <label class="field-label">Wachtwoord</label>
+                <input class="field-input" type="@(Toon ? "text" : "password")" @bind="Wachtwoord" @bind:event="oninput" />
+                @if (!string.IsNullOrEmpty(Wachtwoord))
+                {
+                    <div style="display:flex; gap:4px; margin-top:6px;">
+                        @for (int i = 0; i < 3; i++)
+                        {
+                            <span style="flex:1; height:4px; border-radius:999px; background:@((Sterkte > i) ? "var(--success)" : "#E5E7EB");"></span>
+                        }
+                    </div>
+                    <div class="text-xs" style="color: var(--success); margin-top:4px;">@SterkteLabel</div>
+                }
+            </div>
+
+            <label class="flex gap-8" style="align-items:center; margin: 10px 0;">
+                <input type="checkbox" @bind="Akkoord" /> <span class="text-sm">Ik ga akkoord met de <a href="#" style="font-weight:600;">voorwaarden</a> en <a href="#" style="font-weight:600;">privacyverklaring</a>.</span>
+            </label>
+
+            @if (!string.IsNullOrEmpty(Fout))
+            {
+                <div class="alert-error">@Fout</div>
+            }
+
+            <button class="btn-primary" style="width:100%;" disabled="@(!Geldig)" @onclick="Volgende">Volgende →</button>
+
+            <div class="text-sm text-muted" style="text-align:center; margin-top:12px;">
+                Al een account? <a href="/login" style="font-weight:600; color: var(--text);">Aanmelden</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .step-num {
+        width: 22px; height: 22px; border-radius: 50%;
+        background: rgba(255,255,255,0.15); display:inline-flex; align-items:center; justify-content:center;
+        font-size: 12px; font-weight: 700;
+    }
+</style>
+
+@code {
+    private string Voornaam = "";
+    private string Achternaam = "";
+    private string Email = "";
+    private DateTime? Geboortedatum;
+    private string Wachtwoord = "";
+    private bool Toon = false;
+    private bool Akkoord = false;
+    private string? Fout;
+
+    private int Sterkte
+    {
+        get
+        {
+            if (Wachtwoord.Length < 4) return 1;
+            if (Wachtwoord.Length < 8) return 2;
+            return 3;
+        }
+    }
+
+    private string SterkteLabel
+    {
+        get
+        {
+            if (Sterkte == 1) return "Zwak";
+            if (Sterkte == 2) return "Matig";
+            return "Sterk wachtwoord";
+        }
+    }
+
+    private bool Geldig => !string.IsNullOrWhiteSpace(Voornaam)
+        && !string.IsNullOrWhiteSpace(Achternaam)
+        && Email.Contains("@")
+        && Wachtwoord.Length >= 4
+        && Akkoord;
+
+    private void Volgende()
+    {
+        if (!Geldig) { Fout = "Vul alle velden in en accepteer de voorwaarden."; return; }
+        Draft.Set(Voornaam, Achternaam, Email, Wachtwoord);
+        Nav.NavigateTo("/rolkeuze");
+    }
+}

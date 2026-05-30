@@ -1,0 +1,345 @@
+@page "/coach/team"
+@layout CoachAssist.Shared.Layout.CoachLayout
+@using CoachAssist.Core.DTOs.Speler
+@using CoachAssist.Core.DTOs.Statistiek
+@using CoachAssist.Core.Enums
+@inject NavigationManager Nav
+@inject CoachAssistDataContext DataContext
+@inject Toast Toast
+
+<PageTitle>Mijn ploeg - CoachAssist</PageTitle>
+
+<div class="app-topbar">
+    <div>
+        <div class="text-xs text-muted">@(TeamNaam ?? "Mijn team")</div>
+        <h1>Mijn Ploeg</h1>
+        <div class="app-topbar-sub">@Spelers.Count actieve spelers · @(Seizoen ?? "Seizoen")</div>
+    </div>
+    <div class="app-topbar-actions desktop-only">
+        <input class="search-input" placeholder="Zoek speler..." style="width: 240px;" @bind="Zoek" @bind:event="oninput" />
+        <button class="btn-primary" @onclick="ToggleSpelerForm">+ Speler toevoegen</button>
+    </div>
+</div>
+
+<div class="app-content">
+    <div class="mobile-only">
+        <input class="search-input" placeholder="Zoek speler..." @bind="Zoek" @bind:event="oninput" />
+        <button class="btn-primary mt-12" style="width:100%;" @onclick="ToggleSpelerForm">+ Speler toevoegen</button>
+    </div>
+
+    @if (ToonSpelerForm)
+    {
+        <div class="card mt-16">
+            <div class="flex-between" style="align-items:flex-start; gap:16px;">
+                <div>
+                    <div class="fw-600">Speler toevoegen</div>
+                    <div class="text-sm text-muted">Maak een speler aan voor @(TeamNaam ?? "dit team").</div>
+                </div>
+                <button class="icon-btn" @onclick="ToggleSpelerForm">x</button>
+            </div>
+            <div class="player-form-grid mt-16" style="display:grid; grid-template-columns: repeat(5, minmax(120px, 1fr)); gap:12px;">
+                <input class="input" placeholder="Voornaam" @bind="NieuweSpeler.Voornaam" />
+                <input class="input" placeholder="Achternaam" @bind="NieuweSpeler.Achternaam" />
+                <input class="input" type="number" min="1" placeholder="Rugnummer" @bind="NieuweSpeler.Rugnummer" />
+                <select class="input" @bind="NieuweSpeler.VastePositie">
+                    <option value="">Positie</option>
+                    <option value="@VastePositie.Keeper">Keeper</option>
+                    <option value="@VastePositie.Verdediger">Verdediger</option>
+                    <option value="@VastePositie.Middenvelder">Middenvelder</option>
+                    <option value="@VastePositie.Aanvaller">Aanvaller</option>
+                </select>
+                <button class="btn-primary" @onclick="SpelerToevoegen" disabled="@IsSavingSpeler">@(IsSavingSpeler ? "Toevoegen..." : "Toevoegen")</button>
+            </div>
+        </div>
+    }
+
+    @if (OpenAanvragen > 0)
+    {
+        <div class="card mt-12" style="background:#FEF3C7; border-color:#FDE68A; display:flex; align-items:center; justify-content:space-between;">
+            <div class="flex gap-12" style="align-items:center;">
+                <span class="badge badge-afwacht" style="width:28px; height:28px; padding:0; border-radius:50%; justify-content:center;">@OpenAanvragen</span>
+                <span class="text-sm">spelersverzoeken wachten op goedkeuring.</span>
+            </div>
+            <a class="btn-secondary" href="/coach/verzoeken" style="height:36px; padding:0 14px;">Verzoeken bekijken</a>
+        </div>
+    }
+
+    <div class="flex gap-8 mt-16" style="overflow-x:auto;">
+        @foreach (var f in Filters)
+        {
+            <button class="badge @(f == ActiefFilter ? "badge-actief" : "")"
+                    style="padding: 8px 14px; border: 1px solid @(f == ActiefFilter ? "transparent" : "var(--border)"); background: @(f == ActiefFilter ? "var(--primary)" : "#fff"); color: @(f == ActiefFilter ? "#fff" : "var(--text)"); cursor:pointer;"
+                    @onclick="() => ActiefFilter = f">@f</button>
+        }
+    </div>
+
+    @if (IsLoading)
+    {
+        <div class="card mt-16 text-sm text-muted">Spelers worden geladen...</div>
+    }
+    else if (!string.IsNullOrWhiteSpace(ErrorMessage))
+    {
+        <div class="card mt-16 text-sm" style="background:#FEF2F2; border-color:#FECACA; color:#991B1B;">@ErrorMessage</div>
+    }
+    else if (!Spelers.Any())
+    {
+        <div class="card mt-16 text-sm text-muted">Er zijn nog geen spelers gekoppeld aan dit team.</div>
+    }
+    else
+    {
+        <div class="card mt-16 desktop-only" style="padding:0; overflow:hidden;">
+            <table style="width:100%; border-collapse: collapse;">
+                <thead>
+                    <tr style="background:#F9FAFB; text-align:left; font-size: 12px; color: var(--text-muted); text-transform: uppercase;">
+                        <th style="padding: 12px 16px;">Rugnr</th>
+                        <th>Naam</th>
+                        <th>Positie</th>
+                        <th style="text-align:center;">G</th>
+                        <th style="text-align:center;">A</th>
+                        <th style="text-align:center;">Geel</th>
+                        <th style="text-align:center;">Rood</th>
+                        <th>Min</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var s in Gefilterd)
+                    {
+                        <tr style="border-top: 1px solid var(--border); cursor:pointer;" @onclick="@(() => GoSpeler(s.Nr))">
+                            <td style="padding: 14px 16px;"><span class="badge" style="background: var(--primary); color: var(--highlight); width:28px; height:28px; padding:0; border-radius:50%; justify-content:center; font-weight:700;">@s.Nr</span></td>
+                            <td><div class="flex gap-8" style="align-items:center;"><div class="avatar avatar-sm">@s.Initials</div><span class="fw-600">@s.Naam</span></div></td>
+                            <td class="text-muted">@s.Positie</td>
+                            <td style="text-align:center; font-weight:600;">@s.Goals</td>
+                            <td style="text-align:center; font-weight:600;">@s.Assists</td>
+                            <td style="text-align:center; color: var(--warning); font-weight:600;">@s.Geel</td>
+                            <td style="text-align:center; color: var(--danger); font-weight:600;">@s.Rood</td>
+                            <td class="text-muted">@s.Min'</td>
+                            <td class="text-muted">›</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div class="mobile-only mt-16" style="display:flex; flex-direction:column; gap:10px;">
+            @foreach (var s in Gefilterd)
+            {
+                <div class="card" style="display:flex; align-items:center; gap:12px;">
+                    <div class="avatar">@s.Initials<span class="avatar-num">@s.Nr</span></div>
+                    <div style="flex:1;">
+                        <div class="fw-600">@s.Naam</div>
+                        <div class="text-xs text-muted">@s.Positie</div>
+                        <div class="mt-8">
+                            <span class="stat-chip stat-chip-goal">G @s.Goals</span>
+                            <span class="stat-chip stat-chip-assist">A @s.Assists</span>
+                            <span class="stat-chip stat-chip-yellow"><span class="tag-icon tag-yellow"></span> @s.Geel</span>
+                        </div>
+                    </div>
+                    <span class="text-muted">›</span>
+                </div>
+            }
+        </div>
+    }
+
+    <button class="btn-fab mobile-only" @onclick="ToggleSpelerForm">+</button>
+</div>
+
+<style>
+    @@media (max-width: 900px) {
+        .player-form-grid { grid-template-columns: 1fr !important; }
+    }
+</style>
+
+@code {
+    record Speler(int Nr, string Naam, string Initials, string Positie, int Goals, int Assists, int Geel, int Rood, int Min);
+
+    private sealed class NieuweSpelerModel
+    {
+        public string Voornaam { get; set; } = "";
+        public string Achternaam { get; set; } = "";
+        public int? Rugnummer { get; set; }
+        public VastePositie? VastePositie { get; set; }
+    }
+
+    private string ActiefFilter = "Alle";
+    private string Zoek = "";
+    private bool IsLoading = true;
+    private string? ErrorMessage;
+    private string? TeamNaam;
+    private string? Seizoen;
+    private int? TeamId;
+    private int OpenAanvragen;
+    private bool ToonSpelerForm;
+    private bool IsSavingSpeler;
+    private NieuweSpelerModel NieuweSpeler = new();
+    private readonly List<Speler> Spelers = new();
+    private readonly Dictionary<int, int> SpelerIdsPerRugnummer = new();
+
+    private string[] Filters =>
+    [
+        $"Alle {Spelers.Count}",
+        $"Aanvallers {Spelers.Count(s => IsAanvaller(s.Positie))}",
+        $"Middenvelders {Spelers.Count(s => s.Positie.Contains("middenvelder", StringComparison.OrdinalIgnoreCase))}",
+        $"Verdedigers {Spelers.Count(s => IsVerdediger(s.Positie))}",
+        $"Doelmannen {Spelers.Count(s => IsDoelman(s.Positie))}"
+    ];
+
+    private IEnumerable<Speler> Gefilterd
+    {
+        get
+        {
+            var q = Spelers.AsEnumerable();
+            if (!string.IsNullOrWhiteSpace(Zoek))
+            {
+                q = q.Where(s => s.Naam.Contains(Zoek, StringComparison.OrdinalIgnoreCase)
+                              || s.Positie.Contains(Zoek, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (ActiefFilter.StartsWith("Aanvallers")) q = q.Where(s => IsAanvaller(s.Positie));
+            else if (ActiefFilter.StartsWith("Middenvelders")) q = q.Where(s => s.Positie.Contains("middenvelder", StringComparison.OrdinalIgnoreCase));
+            else if (ActiefFilter.StartsWith("Verdedigers")) q = q.Where(s => IsVerdediger(s.Positie));
+            else if (ActiefFilter.StartsWith("Doelmannen")) q = q.Where(s => IsDoelman(s.Positie));
+
+            return q;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var team = await DataContext.GetTeamVoorCoachAsync();
+            if (team is null)
+            {
+                ErrorMessage = "Er kon geen team gevonden worden voor deze coach.";
+                return;
+            }
+
+            TeamNaam = team.Naam;
+            Seizoen = team.Seizoen;
+            TeamId = team.TeamId;
+            OpenAanvragen = (await DataContext.GetOpenTeamAanvragenAsync(team.TeamId)).Count;
+
+            var seizoenStats = await DataContext.GetSeizoenVoorTeamAsync(team.TeamId);
+            var statsPerSpeler = seizoenStats?.Spelers.ToDictionary(s => s.SpelerId) ?? new Dictionary<int, SeizoenSpelerStats>();
+            var spelers = await DataContext.GetSpelersVoorTeamAsync(team.TeamId);
+
+            foreach (var speler in spelers.OrderBy(s => s.Rugnummer ?? int.MaxValue).ThenBy(s => s.Achternaam))
+            {
+                var stats = statsPerSpeler.GetValueOrDefault(speler.SpelerId);
+                var rugnummer = speler.Rugnummer ?? speler.SpelerId;
+                SpelerIdsPerRugnummer[rugnummer] = speler.SpelerId;
+                Spelers.Add(new Speler(
+                    rugnummer,
+                    $"{speler.Voornaam} {speler.Achternaam}".Trim(),
+                    Initialen(speler.Voornaam, speler.Achternaam),
+                    PositieNaam(speler.VastePositie),
+                    stats?.TotaalGoals ?? 0,
+                    stats?.TotaalAssists ?? 0,
+                    stats?.TotaalGeleKaarten ?? 0,
+                    stats?.TotaalRodeKaarten ?? 0,
+                    stats?.TotaalMinuten ?? 0));
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private void GoSpeler(int nr)
+    {
+        var spelerId = SpelerIdsPerRugnummer.GetValueOrDefault(nr, nr);
+        Nav.NavigateTo($"/coach/speler/{spelerId}");
+    }
+
+    private void ToggleSpelerForm()
+    {
+        ToonSpelerForm = !ToonSpelerForm;
+    }
+
+    private async Task SpelerToevoegen()
+    {
+        if (TeamId is null)
+        {
+            await Toast.Show("Er is geen team gevonden voor deze speler.", "error");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(NieuweSpeler.Voornaam) || string.IsNullOrWhiteSpace(NieuweSpeler.Achternaam))
+        {
+            await Toast.Show("Voornaam en achternaam zijn verplicht.", "error");
+            return;
+        }
+
+        IsSavingSpeler = true;
+        try
+        {
+            var response = await DataContext.MaakSpelerAsync(new MaakSpelerRequest
+            {
+                Voornaam = NieuweSpeler.Voornaam.Trim(),
+                Achternaam = NieuweSpeler.Achternaam.Trim(),
+                Rugnummer = NieuweSpeler.Rugnummer,
+                VastePositie = NieuweSpeler.VastePositie,
+                TeamId = TeamId.Value
+            });
+
+            if (response is not null)
+            {
+                var rugnummer = response.Rugnummer ?? response.SpelerId;
+                SpelerIdsPerRugnummer[rugnummer] = response.SpelerId;
+                Spelers.Add(new Speler(
+                    rugnummer,
+                    $"{response.Voornaam} {response.Achternaam}".Trim(),
+                    Initialen(response.Voornaam, response.Achternaam),
+                    PositieNaam(response.VastePositie),
+                    0,
+                    0,
+                    0,
+                    0,
+                    0));
+            }
+
+            NieuweSpeler = new();
+            ToonSpelerForm = false;
+            await Toast.Show("Speler toegevoegd", "success");
+        }
+        catch (Exception ex)
+        {
+            await Toast.Show(ex.Message, "error", 3500);
+        }
+        finally
+        {
+            IsSavingSpeler = false;
+        }
+    }
+
+    private static string Initialen(string voornaam, string achternaam) =>
+        $"{voornaam.FirstOrDefault()}{achternaam.FirstOrDefault()}".ToUpperInvariant();
+
+    private static string PositieNaam(VastePositie? positie) => positie switch
+    {
+        VastePositie.Keeper => "Keeper",
+        VastePositie.Verdediger => "Verdediger",
+        VastePositie.Middenvelder => "Middenvelder",
+        VastePositie.Aanvaller => "Aanvaller",
+        _ => "Niet gespecificeerd"
+    };
+
+    private static bool IsAanvaller(string positie) =>
+        positie.Contains("Aanvaller", StringComparison.OrdinalIgnoreCase)
+        || positie.Contains("buiten", StringComparison.OrdinalIgnoreCase)
+        || positie.Contains("Spits", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsVerdediger(string positie) =>
+        positie.Contains("Verdediger", StringComparison.OrdinalIgnoreCase)
+        || positie.Contains("achter", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsDoelman(string positie) =>
+        positie.Contains("Keeper", StringComparison.OrdinalIgnoreCase)
+        || positie.Contains("Doelman", StringComparison.OrdinalIgnoreCase);
+}
