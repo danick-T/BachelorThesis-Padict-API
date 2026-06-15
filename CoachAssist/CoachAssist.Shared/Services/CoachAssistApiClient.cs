@@ -108,7 +108,7 @@ public sealed class CoachAssistApiClient : ICoachAssistApiClient
         return result;
     }
 
-    private static async Task EnsureSuccessAsync(
+    public async Task EnsureSuccessAsync(
         HttpResponseMessage response,
         CancellationToken cancellationToken)
     {

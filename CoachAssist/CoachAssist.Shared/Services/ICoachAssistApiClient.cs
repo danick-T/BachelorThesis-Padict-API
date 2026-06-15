@@ -12,5 +12,6 @@ public interface ICoachAssistApiClient
     Task<HttpResponseMessage> SendAuthorizedAsync(HttpRequestMessage request, CancellationToken cancellationToken = default);
     Task<T?> GetFromJsonAuthorizedAsync<T>(string uri, CancellationToken cancellationToken = default);
     Task<HttpResponseMessage> PostAsJsonAuthorizedAsync<T>(string uri, T value, CancellationToken cancellationToken = default);
+    Task EnsureSuccessAsync(HttpResponseMessage response, CancellationToken cancellationToken = default);
     void Logout();
 }

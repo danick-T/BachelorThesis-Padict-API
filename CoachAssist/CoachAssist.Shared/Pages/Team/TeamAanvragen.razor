@@ -136,14 +136,14 @@
         {
             using var request = new HttpRequestMessage(HttpMethod.Put, $"api/aanvragen/team/{aanvraag.AanvraagId}/{actie}");
             using var response = await Api.SendAuthorizedAsync(request);
-            if (!response.IsSuccessStatusCode)
-            {
-                ErrorMessage = "De aanvraag kon niet verwerkt worden.";
-                return;
-            }
+            await Api.EnsureSuccessAsync(response);
 
             aanvraag.Status = nieuweStatus;
             await Toast.Show($"{aanvraag.SpelerNaam} {toastTekst}", toastType);
+        }
+        catch (AuthApiException ex)
+        {
+            ErrorMessage = $"{ex.Message} (HTTP {ex.StatusCode})";
         }
         catch (Exception ex)
         {

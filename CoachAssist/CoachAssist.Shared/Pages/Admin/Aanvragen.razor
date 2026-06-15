@@ -210,16 +210,16 @@
         {
             using var request = new HttpRequestMessage(HttpMethod.Put, $"api/aanvragen/club/{aanvraag.AanvraagId}/{actie}");
             using var response = await Api.SendAuthorizedAsync(request);
-            if (!response.IsSuccessStatusCode)
-            {
-                ErrorMessage = "De aanvraag kon niet verwerkt worden.";
-                return;
-            }
+            await Api.EnsureSuccessAsync(response);
 
             aanvraag.Status = nieuweStatus;
             Geselecteerd.Remove(aanvraag);
             if (Actief == aanvraag) Actief = null;
             await Toast.Show($"{aanvraag.GebruikerNaam} {toastTekst}", toastType);
+        }
+        catch (AuthApiException ex)
+        {
+            ErrorMessage = $"{ex.Message} (HTTP {ex.StatusCode})";
         }
         catch (Exception ex)
         {

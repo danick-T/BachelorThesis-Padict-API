@@ -69,9 +69,17 @@ public class AanvraagRepository : IAanvraagRepository
     public async Task AddTeamAanvraagAsync(TeamAanvraag aanvraag) =>
         await _db.TeamAanvragen.AddAsync(aanvraag);
 
-    public void UpdateClub(ClubAanvraag aanvraag) => _db.ClubAanvragen.Update(aanvraag);
+    public void UpdateClub(ClubAanvraag aanvraag) =>
+        _db.Entry(aanvraag).Property(a => a.Status).IsModified = true;
 
-    public void UpdateTeam(TeamAanvraag aanvraag) => _db.TeamAanvragen.Update(aanvraag);
+    public void UpdateTeam(TeamAanvraag aanvraag)
+    {
+        _db.Entry(aanvraag).Property(a => a.Status).IsModified = true;
+        if (aanvraag.Speler is not null)
+        {
+            _db.Entry(aanvraag.Speler).Property(s => s.TeamId).IsModified = true;
+        }
+    }
 
     public Task SaveChangesAsync() => _db.SaveChangesAsync();
 }
